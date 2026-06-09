@@ -1,12 +1,15 @@
-# OPPRating System v1 — Pipeline Machine
+# OPPRating System — Pipeline Machine
 
-The commercial engine of Oppr B.V., run as a real tool. A HubSpot-style pipeline board
-that enforces the Pipeline Operating Manual (Lars Grønkjær, June 2026 v1.0): stages,
-exit gates, CP1–CP3 MEDDIC checkpoints, override flags, an append-only deal record,
-a replayable timeline, a weekly roll-up, and an AI analyst you can ask questions.
+The commercial engine of Oppr B.V., run as a real tool. A pipeline board that enforces
+the Pipeline Operating Manual (Lars Grønkjær, June 2026 v1.0): stages, exit gates,
+CP1–CP3 MEDDIC checkpoints, override flags, an append-only deal record with full
+evidence provenance, a replayable timeline, the Monday stand-up, and an AI analyst.
 
-All deal data is **simulated** on the real NL priority targets (waste collectors and
-WtE operators). The point: see what the machine looks like before building it in HubSpot.
+**Two workspaces** (switcher, top left):
+- **Simulation** — 13 seeded deals on the real NL priority targets, frozen sim clock,
+  resettable. The training ground.
+- **Live** — starts empty, real dates. Create deals, file updates by guided AI
+  interview (voice or typed), evidence drop, or by hand. The real thing.
 
 ## Stack
 

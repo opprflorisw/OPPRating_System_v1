@@ -112,9 +112,9 @@ async function callGemini(system: string, user: string): Promise<string> {
 }
 
 export const ask = action({
-  args: { question: v.string(), asOf: v.string() },
-  handler: async (ctx, { question, asOf }): Promise<string> => {
-    const deals = (await ctx.runQuery(api.deals.list, {})) as unknown as DealWithEvents[];
+  args: { question: v.string(), asOf: v.string(), workspace: v.optional(v.string()) },
+  handler: async (ctx, { question, asOf, workspace }): Promise<string> => {
+    const deals = (await ctx.runQuery(api.deals.list, { workspace })) as unknown as DealWithEvents[];
     const context = buildContext(deals, asOf);
     return await callGemini(
       SYSTEM,
@@ -127,9 +127,9 @@ export const ask = action({
 // (stage moves, MEDDIC letter changes, blockers opened/resolved), not on the
 // underlying templates.
 export const standup = action({
-  args: { asOf: v.string() },
-  handler: async (ctx, { asOf }): Promise<string> => {
-    const deals = (await ctx.runQuery(api.deals.list, {})) as unknown as DealWithEvents[];
+  args: { asOf: v.string(), workspace: v.optional(v.string()) },
+  handler: async (ctx, { asOf, workspace }): Promise<string> => {
+    const deals = (await ctx.runQuery(api.deals.list, { workspace })) as unknown as DealWithEvents[];
     const lastWeek = new Date(new Date(asOf).getTime() - 7 * 86400000).toISOString().slice(0, 10);
     const now = buildContext(deals, asOf);
     const prev = buildContext(deals, lastWeek);
@@ -149,9 +149,9 @@ export const standup = action({
 });
 
 export const weeklyReview = action({
-  args: { asOf: v.string() },
-  handler: async (ctx, { asOf }): Promise<string> => {
-    const deals = (await ctx.runQuery(api.deals.list, {})) as unknown as DealWithEvents[];
+  args: { asOf: v.string(), workspace: v.optional(v.string()) },
+  handler: async (ctx, { asOf, workspace }): Promise<string> => {
+    const deals = (await ctx.runQuery(api.deals.list, { workspace })) as unknown as DealWithEvents[];
     const context = buildContext(deals, asOf);
     const totalOpen = deals.length;
     return await callGemini(

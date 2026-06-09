@@ -9,6 +9,7 @@ import type { DealRow } from "../App";
 interface Props {
   rows: DealRow[];
   asOf: string;
+  workspace: string;
   clientSlug: string | null;
   live: boolean;
   onOpenClient: (slug: string | null) => void;
@@ -69,7 +70,7 @@ function ClientList({ rows, asOf, onOpenClient }: Props) {
   );
 }
 
-function ClientDetail({ row, rows, asOf, live, onOpenClient, onOpenDeal, onNewSnapshot }: Props & { row: DealRow }) {
+function ClientDetail({ row, rows, asOf, workspace, live, onOpenClient, onOpenDeal, onNewSnapshot }: Props & { row: DealRow }) {
   const askAi = useAction(api.chat.ask);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -188,6 +189,7 @@ function ClientDetail({ row, rows, asOf, live, onOpenClient, onOpenDeal, onNewSn
                     setAnalysis(
                       await askAi({
                         asOf,
+                        workspace,
                         question:
                           `Analyse the MEDDIC snapshot history for ${deal.account} (${deal.site}). ` +
                           `What improved, what is structurally stuck (letters flat or low across snapshots), what is the single highest-leverage gap to fix now, and what does the trajectory say about whether this deal will close by its target? Use the scores and gaps in the data. Short, direct, no filler.`,

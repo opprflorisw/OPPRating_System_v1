@@ -3,6 +3,7 @@ import { useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { TEMPLATES, TEMPLATE_BY_ID, TEAM, type Template, type TemplateField } from "../../convex/pipeline";
 import { meddicHistory } from "../../convex/derive";
+import { GuidedChat } from "./GuidedChat";
 import type { DealRow } from "../App";
 
 interface Props {
@@ -13,6 +14,8 @@ interface Props {
 }
 
 type Provenance = "manual" | "ai" | "ai-edited";
+type Step = "mode" | "guided" | "evidence" | "form";
+
 interface FieldState {
   value: string | boolean;
   provenance: Provenance;
@@ -28,7 +31,7 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
   );
   const preselected = preselect ? TEMPLATE_BY_ID[preselect] : available.length === 1 ? available[0] : null;
   const [tpl, setTpl] = useState<Template | null>(preselected);
-  const [step, setStep] = useState<"evidence" | "form">("evidence");
+  const [step, setStep] = useState<Step>("mode");
   const [author, setAuthor] = useState(TEAM[0]);
   const [fields, setFields] = useState<Record<string, FieldState>>({});
   const [evidenceText, setEvidenceText] = useState("");
@@ -50,7 +53,14 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
       return { ...prev, [id]: { ...base, ...patch } };
     });
 
-  // ── Voice memo ────────────────────────────────────────────────────────
+  const ensureAllFields = (next: Record<string, FieldState>, t: Template) => {
+    for (const f of t.fields) {
+      if (!next[f.id]) next[f.id] = { value: f.kind === "check" ? false : "", provenance: "manual", accepted: true };
+    }
+    return next;
+  };
+
+  // ── Voice memo (evidence mode) ────────────────────────────────────────
   const toggleRecording = async () => {
     if (recording) {
       recorderRef.current?.stop();
@@ -75,7 +85,7 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
     }
   };
 
-  // ── AI extraction ─────────────────────────────────────────────────────
+  // ── AI extraction (evidence mode) ─────────────────────────────────────
   const runExtract = async () => {
     if (!tpl) return;
     setBusy("Extracting from evidence…");
@@ -106,11 +116,9 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
             quote: p.quote,
             accepted: true,
           };
-        } else if (!next[f.id]) {
-          next[f.id] = { value: f.kind === "check" ? false : "", provenance: "manual", accepted: true };
         }
       }
-      setFields(next);
+      setFields(ensureAllFields(next, tpl));
       setStep("form");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -119,13 +127,10 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
     }
   };
 
+  // ── Manual / prefill ──────────────────────────────────────────────────
   const startManual = () => {
     if (!tpl) return;
-    const next: Record<string, FieldState> = { ...fields };
-    for (const f of tpl.fields) {
-      if (!next[f.id]) next[f.id] = { value: f.kind === "check" ? false : "", provenance: "manual", accepted: true };
-    }
-    // MEDDIC: prefill from the previous snapshot so only the changes need typing.
+    const next = ensureAllFields({ ...fields }, tpl);
     if (tpl.id === "meddic_snapshot") {
       const history = meddicHistory(deal.events, asOf);
       const prev = history[history.length - 1];
@@ -139,6 +144,24 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
       }
     }
     setFields(next);
+    setStep("form");
+  };
+
+  // ── Guided interview result ───────────────────────────────────────────
+  const onGuidedDone = (collected: Record<string, string>) => {
+    if (!tpl) return;
+    const next: Record<string, FieldState> = { ...fields };
+    for (const f of tpl.fields) {
+      const v = collected[f.id];
+      if (v !== undefined && v !== "") {
+        next[f.id] = {
+          value: f.kind === "check" ? v === "true" : v,
+          provenance: "ai",
+          accepted: true,
+        };
+      }
+    }
+    setFields(ensureAllFields(next, tpl));
     setStep("form");
   };
 
@@ -181,6 +204,8 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
   };
 
   // ── Render ────────────────────────────────────────────────────────────
+  const backFromMode = () => (preselect || available.length === 1 ? onClose() : setTpl(null));
+
   return (
     <>
       <div className="scrim modal-scrim" onClick={onClose} />
@@ -192,7 +217,7 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
             <p className="modal-sub">Pick the record to file at this stage. To park or lose the deal, use the ··· menu on the deal instead.</p>
             <div className="tpl-pick">
               {available.map((t) => (
-                <button key={t.id} className="tpl-option" onClick={() => setTpl(t)}>
+                <button key={t.id} className="tpl-option" onClick={() => { setTpl(t); setStep("mode"); }}>
                   <b>{t.name}</b>
                   <span className="pill blue">{t.discipline}</span>
                   <span className="tpl-desc">{t.description}</span>
@@ -200,11 +225,45 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
               ))}
             </div>
           </>
+        ) : step === "mode" ? (
+          <>
+            <p className="modal-sub"><b>{tpl.name}</b> · {tpl.discipline}. How do you want to fill it in?</p>
+            <div className="mode-cards">
+              <button className="mode-card" onClick={() => setStep("guided")}>
+                <span className="mode-icon">✦</span>
+                <b>Guided interview</b>
+                <span>Talk to the most experienced person for this gate. Grouped questions, voice or typing, follows up on what's missing.</span>
+              </button>
+              <button className="mode-card" onClick={() => setStep("evidence")}>
+                <span className="mode-icon">📎</span>
+                <b>Drop evidence</b>
+                <span>Paste notes, upload a file or record one voice memo. The AI extracts the fields, you confirm.</span>
+              </button>
+              <button className="mode-card quiet" onClick={startManual}>
+                <span className="mode-icon">✍</span>
+                <b>Fill manually</b>
+                <span>The classic form{tpl.id === "meddic_snapshot" ? ", pre-filled from the previous snapshot" : ""}.</span>
+              </button>
+            </div>
+            <footer className="modal-foot">
+              <button className="btn quiet" onClick={backFromMode}>Back</button>
+            </footer>
+          </>
+        ) : step === "guided" ? (
+          <GuidedChat row={row} templateId={tpl.id} onDone={onGuidedDone} onBack={() => setStep("mode")} />
         ) : step === "evidence" ? (
           <>
             <p className="modal-sub">
-              <b>{tpl.name}</b> · {tpl.discipline}. Drop in your raw notes, a document or a voice memo — the AI fills the fields against this stage's requirements, you confirm.
+              Drop in your raw notes, a document or a voice memo — the AI fills the fields against this stage's requirements, you confirm.
             </p>
+            <div className="cover-list">
+              <span className="faint" style={{ fontSize: 11.5 }}>Cover these in your note or memo:</span>
+              {tpl.fields.filter((f) => f.kind !== "check").slice(0, 10).map((f) => (
+                <span key={f.id} className={"pill " + (f.satisfiesGate ? "blue" : "outline")}>
+                  {(f.group ? f.group.split("—")[0].trim() + ": " : "") + f.label}
+                </span>
+              ))}
+            </div>
             <div className="evidence">
               <textarea
                 placeholder="Paste call notes, an email thread, bullets — anything…"
@@ -239,8 +298,7 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
             </div>
             {error && <p style={{ color: "var(--red)", fontSize: 12 }}>{error}</p>}
             <footer className="modal-foot">
-              <button className="btn quiet" onClick={() => (preselect || available.length === 1 ? onClose() : setTpl(null))} disabled={!!busy}>Back</button>
-              <button className="btn skip" onClick={startManual} disabled={!!busy}>Fill manually instead</button>
+              <button className="btn quiet" onClick={() => setStep("mode")} disabled={!!busy}>← Mode</button>
               <span className="spacer" />
               <button
                 className="btn ai"
@@ -254,12 +312,12 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
         ) : (
           <>
             <p className="modal-sub">
-              Review and confirm. <span className="pill violet">✦ AI</span> values were extracted from your evidence — edit or reject anything. Fields marked ⛩ satisfy an exit gate.
+              Review and confirm. <span className="pill violet">✦ AI</span> values came from your evidence or the interview — edit or reject anything. Fields marked ⛩ satisfy an exit gate.
             </p>
             <FormFields tpl={tpl} fields={fields} setField={setField} />
             {error && <p style={{ color: "var(--red)", fontSize: 12 }}>{error}</p>}
             <footer className="modal-foot">
-              <button className="btn quiet" onClick={() => setStep("evidence")} disabled={!!busy}>← Evidence</button>
+              <button className="btn quiet" onClick={() => setStep("mode")} disabled={!!busy}>← Mode</button>
               <div className="filed-by">
                 <span className="muted" style={{ fontSize: 12 }}>Filed by</span>
                 <select value={author} onChange={(e) => setAuthor(e.target.value)}>

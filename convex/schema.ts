@@ -3,6 +3,8 @@ import { v } from "convex/values";
 
 export default defineSchema({
   deals: defineTable({
+    // "sim" (seeded scenario) or "live" (real data). Missing = sim (pre-split docs).
+    workspace: v.optional(v.string()),
     slug: v.string(),
     account: v.string(),
     site: v.string(),

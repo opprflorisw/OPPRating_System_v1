@@ -8,11 +8,12 @@ import type { DealRow } from "../App";
 interface Props {
   rows: DealRow[];
   asOf: string;
+  workspace: string;
 }
 
 // The sales-leader Monday view: built on the deltas of the last 7 days —
 // stage moves, MEDDIC letter changes, blockers — not on raw filings.
-export function Standup({ rows, asOf }: Props) {
+export function Standup({ rows, asOf, workspace }: Props) {
   const standup = useAction(api.chat.standup);
   const [brief, setBrief] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -106,7 +107,7 @@ export function Standup({ rows, asOf }: Props) {
           onClick={async () => {
             setBusy(true);
             setBrief(null);
-            try { setBrief(await standup({ asOf })); } finally { setBusy(false); }
+            try { setBrief(await standup({ asOf, workspace })); } finally { setBusy(false); }
           }}
         >
           {busy ? "Writing the brief…" : "✦ Generate the stand-up brief"}

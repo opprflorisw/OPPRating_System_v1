@@ -14,7 +14,7 @@ const SUGGESTIONS = [
   "Summarise the Attero Wijster record for a handover.",
 ];
 
-export function ChatDock({ asOf }: { asOf: string }) {
+export function ChatDock({ asOf, workspace }: { asOf: string; workspace: string }) {
   const ask = useAction(api.chat.ask);
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -28,7 +28,7 @@ export function ChatDock({ asOf }: { asOf: string }) {
     setInput("");
     setBusy(true);
     try {
-      const answer = await ask({ question: q, asOf });
+      const answer = await ask({ question: q, asOf, workspace });
       setMsgs((m) => [...m, { role: "ai", text: answer }]);
       setTimeout(() => bodyRef.current?.scrollTo({ top: 99999, behavior: "smooth" }), 50);
     } finally {

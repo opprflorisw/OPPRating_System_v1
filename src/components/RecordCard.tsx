@@ -26,12 +26,34 @@ interface Props {
 type Tab = "overview" | "gates" | "activity" | "meddic";
 
 export function RecordCard(props: Props) {
-  const { row, live, onClose, onFileUpdate, onRequestMove, onDisposition, onOpenClient } = props;
+  const { row, live, asOf, onClose, onFileUpdate, onRequestMove, onDisposition, onOpenClient } = props;
   const { deal, state } = row;
   const stage = STAGE_BY_ID[state.stageId];
   const [tab, setTab] = useState<Tab>("overview");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
   const next = nextStageId(state.stageId);
+  const appendEvent = useMutation(api.deals.appendEvent);
+
+  // Where a parked deal would return to: the stage it paused from.
+  const pausedFrom = stage.parking
+    ? deal.events.filter((e) => e.type === "stage" && e.to === state.stageId).slice(-1)[0]?.from ?? "lead"
+    : null;
+
+  const reactivate = async () => {
+    if (!pausedFrom) return;
+    setReactivating(true);
+    try {
+      await appendEvent({
+        dealId: deal._id as never,
+        at: asOf, author: "Floris", discipline: "Sales", type: "stage",
+        from: state.stageId, to: pausedFrom,
+        note: `Reactivated from ${stage.name} back to ${STAGE_BY_ID[pausedFrom]?.name ?? pausedFrom}.`,
+      });
+    } finally {
+      setReactivating(false);
+    }
+  };
 
   return (
     <>
@@ -43,6 +65,11 @@ export function RecordCard(props: Props) {
             <div className="drawer-site">{deal.site} · {deal.throughput} · {deal.capability}</div>
           </div>
           <div className="drawer-head-actions">
+            {live && stage.parking && pausedFrom && (
+              <button className="btn" onClick={reactivate} disabled={reactivating}>
+                {reactivating ? "Reactivating…" : `▶ Reactivate to ${STAGE_BY_ID[pausedFrom]?.name ?? pausedFrom}`}
+              </button>
+            )}
             {live && !stage.terminal && !stage.parking && (
               <>
                 <button className="btn primary" onClick={() => onFileUpdate()}>File an update</button>

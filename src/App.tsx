@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { SIM_START, SIM_TODAY, STAGE_BY_ID } from "../convex/pipeline";
@@ -9,6 +9,7 @@ import { RecordCard } from "./components/RecordCard";
 import { GateModal } from "./components/GateModal";
 import { UpdateModal } from "./components/UpdateModal";
 import { DispositionModal } from "./components/DispositionModal";
+import { NewDealModal } from "./components/NewDealModal";
 import { Clients } from "./components/Clients";
 import { Standup } from "./components/Standup";
 import { Library } from "./components/Library";
@@ -29,19 +30,35 @@ const PAGE_TITLES: Record<Page, string> = {
 };
 
 export default function App() {
-  const deals = useQuery(api.deals.list, {}) as Deal[] | undefined;
+  const [workspace, setWorkspace] = useState<string>(() => localStorage.getItem("opprating-ws") ?? "sim");
+  useEffect(() => localStorage.setItem("opprating-ws", workspace), [workspace]);
+
+  const deals = useQuery(api.deals.list, { workspace }) as Deal[] | undefined;
   const resetScenario = useMutation(api.deals.resetScenario);
+
+  const isSim = workspace === "sim";
+  const realToday = new Date().toISOString().slice(0, 10);
+  const today = isSim ? SIM_TODAY : realToday;
 
   const [page, setPage] = useState<Page>("pipeline");
   const [clientSlug, setClientSlug] = useState<string | null>(null);
-  const [asOf, setAsOf] = useState<string>(SIM_TODAY);
+  const [asOf, setAsOf] = useState<string>(today);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState<DealRow | null>(null);
   const [updateFor, setUpdateFor] = useState<{ row: DealRow; templateId?: string } | null>(null);
   const [dispositionFor, setDispositionFor] = useState<DealRow | null>(null);
+  const [newDealOpen, setNewDealOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
 
-  const live = asOf === SIM_TODAY;
+  // Switching workspace jumps the clock to that workspace's "today".
+  const switchWorkspace = (ws: string) => {
+    setWorkspace(ws);
+    setAsOf(ws === "sim" ? SIM_TODAY : realToday);
+    setClientSlug(null);
+    setSelectedId(null);
+  };
+
+  const live = asOf === today;
   const rows: DealRow[] = useMemo(
     () => (deals ?? []).map((deal) => ({ deal, state: replay(deal.events, deal.acv, asOf) })),
     [deals, asOf]
@@ -61,10 +78,18 @@ export default function App() {
     };
   }, [rows]);
 
-  const totalDays = Math.round((new Date(SIM_TODAY).getTime() - new Date(SIM_START).getTime()) / 86400000);
-  const dayOffset = Math.round((new Date(asOf).getTime() - new Date(SIM_START).getTime()) / 86400000);
+  // Replay window: sim is fixed; live runs from the earliest event (or 60 days back) to real today.
+  const windowStart = useMemo(() => {
+    if (isSim) return SIM_START;
+    const earliest = (deals ?? []).flatMap((d) => d.events.map((e) => e.at)).sort()[0];
+    const fallback = new Date(new Date(realToday).getTime() - 60 * 86400000).toISOString().slice(0, 10);
+    return earliest && earliest < realToday ? earliest : fallback;
+  }, [isSim, deals, realToday]);
+
+  const totalDays = Math.max(1, Math.round((new Date(today).getTime() - new Date(windowStart).getTime()) / 86400000));
+  const dayOffset = Math.min(totalDays, Math.max(0, Math.round((new Date(asOf).getTime() - new Date(windowStart).getTime()) / 86400000)));
   const setDay = (n: number) =>
-    setAsOf(new Date(new Date(SIM_START).getTime() + n * 86400000).toISOString().slice(0, 10));
+    setAsOf(new Date(new Date(windowStart).getTime() + n * 86400000).toISOString().slice(0, 10));
 
   const seeded = deals !== undefined && deals.length > 0;
 
@@ -75,25 +100,44 @@ export default function App() {
           <div className="side-logo">O</div>
           <div className="side-name">OPPRating<small>Commercial Engine</small></div>
         </div>
+
+        <div className="ws-switch">
+          <button className={"ws-opt" + (isSim ? " active" : "")} onClick={() => switchWorkspace("sim")}>
+            <span className="ws-dot sim" /> Simulation
+          </button>
+          <button className={"ws-opt" + (!isSim ? " active" : "")} onClick={() => switchWorkspace("live")}>
+            <span className="ws-dot live" /> Live
+          </button>
+        </div>
+
         <nav className="side-nav">
           <NavItem icon={<IconBoard />} label="Pipeline" active={page === "pipeline"} onClick={() => setPage("pipeline")} />
-          <NavItem icon={<IconPeople />} label="Clients" active={page === "clients"} onClick={() => { setPage("clients"); }} />
+          <NavItem icon={<IconPeople />} label="Clients" active={page === "clients"} onClick={() => setPage("clients")} />
           <NavItem icon={<IconPulse />} label="Monday Stand-up" active={page === "standup"} onClick={() => setPage("standup")} />
           <NavItem icon={<IconBook />} label="Library" active={page === "library"} onClick={() => setPage("library")} />
         </nav>
+
+        <button className="btn primary" style={{ margin: "14px 8px 0", justifyContent: "center" }} onClick={() => setNewDealOpen(true)}>
+          + New deal
+        </button>
+
         <div className="side-foot">
-          <button
-            className="btn quiet tiny"
-            disabled={resetting}
-            onClick={async () => {
-              if (!confirm("Reset the simulated scenario? All your changes are wiped and the seed data restored.")) return;
-              setResetting(true);
-              try { await resetScenario({}); } finally { setResetting(false); }
-            }}
-          >
-            {resetting ? "Resetting…" : seeded ? "↺ Reset scenario" : "Load scenario"}
-          </button>
-          <span className="sim-badge">SIMULATED DATA</span>
+          {isSim && (
+            <button
+              className="btn quiet tiny"
+              disabled={resetting}
+              onClick={async () => {
+                if (!confirm("Reset the simulated scenario? All your changes in the simulation are wiped and the seed data restored. The live workspace is untouched.")) return;
+                setResetting(true);
+                try { await resetScenario({}); } finally { setResetting(false); }
+              }}
+            >
+              {resetting ? "Resetting…" : "↺ Reset scenario"}
+            </button>
+          )}
+          {isSim
+            ? <span className="sim-badge">SIMULATED DATA</span>
+            : <span className="sim-badge live-badge">LIVE WORKSPACE</span>}
         </div>
       </aside>
 
@@ -110,7 +154,7 @@ export default function App() {
             <span className="replay-label">Replay</span>
             <input type="range" min={0} max={totalDays} value={dayOffset} onChange={(e) => setDay(Number(e.target.value))} />
             <span className={"replay-date " + (live ? "live" : "past")}>{live ? "● live · " + asOf : asOf}</span>
-            {!live && <button className="btn quiet tiny" onClick={() => setAsOf(SIM_TODAY)}>today</button>}
+            {!live && <button className="btn quiet tiny" onClick={() => setAsOf(today)}>today</button>}
           </div>
         </header>
 
@@ -118,16 +162,30 @@ export default function App() {
           {deals === undefined ? (
             <div className="empty">Connecting to Convex…</div>
           ) : !seeded ? (
-            <div className="empty">
-              <p>No scenario loaded yet.</p>
-              <button className="btn primary" onClick={() => resetScenario({})}>Load the simulated scenario (13 NL targets)</button>
-            </div>
+            isSim ? (
+              <div className="empty">
+                <p>No scenario loaded yet.</p>
+                <button className="btn primary" onClick={() => resetScenario({})}>Load the simulated scenario (13 NL targets)</button>
+              </div>
+            ) : (
+              <div className="empty">
+                <div className="onboard">
+                  <h3>The live workspace is empty.</h3>
+                  <p>
+                    This is the real thing — no simulated data, real dates. Create your first deal,
+                    file the pre-meeting prep (guided, by voice, or by hand), and start climbing the staircase.
+                  </p>
+                  <button className="btn primary" onClick={() => setNewDealOpen(true)}>+ Create your first deal</button>
+                </div>
+              </div>
+            )
           ) : page === "pipeline" ? (
             <Board rows={rows} live={live} onSelect={setSelectedId} onRequestMove={(row) => live && setPendingMove(row)} />
           ) : page === "clients" ? (
             <Clients
               rows={rows}
               asOf={asOf}
+              workspace={workspace}
               clientSlug={clientSlug}
               onOpenClient={setClientSlug}
               onOpenDeal={setSelectedId}
@@ -135,7 +193,7 @@ export default function App() {
               live={live}
             />
           ) : page === "standup" ? (
-            <Standup rows={rows} asOf={asOf} />
+            <Standup rows={rows} asOf={asOf} workspace={workspace} />
           ) : (
             <Library />
           )}
@@ -159,8 +217,16 @@ export default function App() {
         <UpdateModal row={updateFor.row} asOf={asOf} preselect={updateFor.templateId} onClose={() => setUpdateFor(null)} />
       )}
       {dispositionFor && live && <DispositionModal row={dispositionFor} asOf={asOf} onClose={() => setDispositionFor(null)} />}
+      {newDealOpen && (
+        <NewDealModal
+          workspace={workspace}
+          today={today}
+          onClose={() => setNewDealOpen(false)}
+          onCreated={(dealId) => { setPage("pipeline"); setSelectedId(dealId); }}
+        />
+      )}
 
-      <ChatDock asOf={asOf} />
+      <ChatDock asOf={asOf} workspace={workspace} />
     </div>
   );
 }
