@@ -1,0 +1,7 @@
+# CLI deploys upload from local disk. Unlike .gitignore, this keeps
+# convex/_generated (required by the Vite build) in the upload.
+node_modules
+dist
+.env
+.env.local
+.git
