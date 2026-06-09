@@ -31,7 +31,9 @@ export default defineSchema({
     attachments: v.optional(
       v.array(v.object({ storageId: v.string(), name: v.string(), mime: v.string() }))
     ),
-    // Per-field provenance: "manual" | "ai" | "ai-edited"
+    // Per-field provenance: "manual" | "ai" | "ai-edited" | {kind, quote}
     provenance: v.optional(v.any()),
+    // Verbatim pasted notes — root evidence behind extracted values.
+    evidenceText: v.optional(v.string()),
   }).index("by_deal", ["dealId"]),
 });

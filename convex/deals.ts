@@ -15,7 +15,23 @@ export const list = query({
         .withIndex("by_deal", (q) => q.eq("dealId", deal._id))
         .collect();
       events.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : a._creationTime - b._creationTime));
-      result.push({ ...deal, events });
+      // Resolve attachment URLs so root evidence (voice memos, files) is
+      // playable/openable straight from the record.
+      const withUrls = [];
+      for (const e of events) {
+        if (e.attachments && e.attachments.length > 0) {
+          const attachments = [];
+          for (const a of e.attachments) {
+            let url: string | null = null;
+            try { url = await ctx.storage.getUrl(a.storageId as never); } catch { /* dangling id */ }
+            attachments.push({ ...a, url });
+          }
+          withUrls.push({ ...e, attachments });
+        } else {
+          withUrls.push(e);
+        }
+      }
+      result.push({ ...deal, events: withUrls });
     }
     return result;
   },
@@ -41,6 +57,7 @@ export const appendEvent = mutation({
       v.array(v.object({ storageId: v.string(), name: v.string(), mime: v.string() }))
     ),
     provenance: v.optional(v.any()),
+    evidenceText: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("events", args);

@@ -148,7 +148,7 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
     setBusy("Filing…");
     try {
       const payload: Record<string, unknown> = {};
-      const provenance: Record<string, Provenance> = {};
+      const provenance: Record<string, { kind: Provenance; quote?: string }> = {};
       const gates: string[] = [];
       for (const f of tpl.fields) {
         const fs = fields[f.id];
@@ -156,7 +156,7 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
         const v = fs.value;
         if (v === "" || v === undefined) continue;
         payload[f.id] = f.kind === "number" || f.kind === "currency" ? Number(v) : v;
-        provenance[f.id] = fs.provenance;
+        provenance[f.id] = { kind: fs.provenance, ...(fs.quote ? { quote: fs.quote } : {}) };
         if (f.satisfiesGate && (f.kind === "check" ? v === true : String(v).trim() !== "")) gates.push(f.satisfiesGate);
       }
       await appendEvent({
@@ -169,6 +169,7 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
         payload,
         gatesSatisfied: gates.length ? gates : undefined,
         provenance,
+        evidenceText: evidenceText.trim() || undefined,
         attachments: uploaded.length
           ? uploaded.map((u) => ({ storageId: u.id, name: u.name, mime: u.mime }))
           : undefined,

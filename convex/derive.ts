@@ -4,7 +4,10 @@
 // Pure functions, shared by frontend and backend. `asOf` makes time travel free.
 // ============================================================================
 
-import { STAGE_BY_ID, type DealEvent, type Stage } from "./pipeline";
+import {
+  STAGE_BY_ID, STAGES, TEMPLATES, TEMPLATE_BY_ID, provInfo,
+  type DealEvent, type Stage, type ProvenanceInfo,
+} from "./pipeline";
 
 export interface GateEvidence {
   at: string;
@@ -171,6 +174,154 @@ export interface LetterDelta {
   currScore: number | null;
   scoreDelta: number | null;
   textChanged: boolean;
+}
+
+// ── The provenance chain: gate → field → filings → evidence ────────────────
+
+// Which (template, field) pairs can satisfy each gate.
+const GATE_FIELDS: Record<string, { templateId: string; fieldId: string }[]> = {};
+for (const t of TEMPLATES) {
+  for (const f of t.fields) {
+    if (f.satisfiesGate) (GATE_FIELDS[f.satisfiesGate] ??= []).push({ templateId: t.id, fieldId: f.id });
+  }
+}
+
+export interface GateEntry {
+  at: string;
+  author: string;
+  templateId?: string;
+  value: string;
+  kind: "passed" | "reaffirmed" | "updated";
+  prov: ProvenanceInfo | null;
+  changed: boolean; // value differs from the previous entry
+  hasEvidence: boolean; // the filing carried raw evidence (text or attachments)
+}
+
+// Every touch of every gate, in order: the first satisfying filing ("passed"),
+// later filings that list it again ("reaffirmed"), and later filings whose
+// satisfying field carries a DIFFERENT value without re-listing the gate
+// ("updated" — the ↻ drift marker).
+export function gateLedger(events: DealEvent[], asOf: string): Record<string, GateEntry[]> {
+  const sorted = events
+    .filter((e) => e.at <= asOf)
+    .slice()
+    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  const ledger: Record<string, GateEntry[]> = {};
+
+  for (const e of sorted) {
+    const listed = new Set(e.gatesSatisfied ?? []);
+    const touched = new Map<string, { value: string; fieldId: string }>();
+    if (e.type === "template" && e.payload && e.templateId) {
+      for (const [gateId, pairs] of Object.entries(GATE_FIELDS)) {
+        for (const p of pairs) {
+          if (p.templateId !== e.templateId) continue;
+          const v = (e.payload as Record<string, unknown>)[p.fieldId];
+          if (v === undefined || v === null || v === "" || v === false) continue;
+          touched.set(gateId, { value: typeof v === "boolean" ? "Confirmed" : String(v), fieldId: p.fieldId });
+        }
+      }
+    }
+    const gateIds = new Set([...listed, ...touched.keys()]);
+    for (const gateId of gateIds) {
+      const entries = (ledger[gateId] ??= []);
+      const t = touched.get(gateId);
+      const value = t?.value ?? e.note ?? (e.templateId ? `Filed ${TEMPLATE_BY_ID[e.templateId]?.name ?? e.templateId}` : e.type);
+      const prevValue = entries.length ? entries[entries.length - 1].value : null;
+      const changed = prevValue !== null && prevValue !== value;
+      const isListed = listed.has(gateId);
+      // A repeat filing with an identical value and no explicit re-listing
+      // carries no signal — skip it.
+      if (!isListed && !changed && entries.length > 0) continue;
+      entries.push({
+        at: e.at,
+        author: e.author,
+        templateId: e.templateId,
+        value,
+        kind: isListed ? (entries.some((x) => x.kind === "passed") ? "reaffirmed" : "passed") : "updated",
+        prov: t ? provInfo(e.provenance, t.fieldId) : null,
+        changed,
+        hasEvidence: Boolean(e.evidenceText || (e.attachments && e.attachments.length > 0)),
+      });
+    }
+  }
+  return ledger;
+}
+
+// ↻ drift: the gate passed on one value and the latest value differs.
+export function gateDrift(entries: GateEntry[] | undefined): { from: string; to: string; at: string } | null {
+  if (!entries) return null;
+  const passed = entries.find((x) => x.kind === "passed");
+  if (!passed) return null;
+  const last = entries[entries.length - 1];
+  return last.value !== passed.value ? { from: passed.value, to: last.value, at: last.at } : null;
+}
+
+// The staircase: which stages this deal has been through, with entry/exit dates.
+export interface StageVisit {
+  stageId: string;
+  enteredAt: string;
+  exitedAt: string | null;
+}
+
+export function stageHistory(events: DealEvent[], asOf: string): StageVisit[] {
+  const sorted = events
+    .filter((e) => e.at <= asOf)
+    .slice()
+    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  const visits: StageVisit[] = [{ stageId: "lead", enteredAt: sorted[0]?.at ?? asOf, exitedAt: null }];
+  for (const e of sorted) {
+    if (e.type === "stage" && e.to) {
+      visits[visits.length - 1].exitedAt = e.at;
+      visits.push({ stageId: e.to, enteredAt: e.at, exitedAt: null });
+    }
+  }
+  return visits;
+}
+
+// What a filing actually changed vs the previous filing of the same template —
+// the old → new diff behind a condensed activity row.
+export interface FieldChange {
+  fieldId: string;
+  label: string;
+  group?: string;
+  oldValue: string | null;
+  newValue: string;
+  prov: ProvenanceInfo | null;
+  satisfiesGate?: string;
+}
+
+export function eventFieldChanges(events: DealEvent[], event: DealEvent): FieldChange[] {
+  if (event.type !== "template" || !event.payload || !event.templateId) return [];
+  const tpl = TEMPLATE_BY_ID[event.templateId];
+  if (!tpl) return [];
+  const sorted = events
+    .filter((e) => e.type === "template" && e.templateId === event.templateId)
+    .slice()
+    .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  const idx = sorted.indexOf(event);
+  const prev = idx > 0 ? (sorted[idx - 1].payload as Record<string, unknown>) : null;
+  const changes: FieldChange[] = [];
+  for (const f of tpl.fields) {
+    const raw = (event.payload as Record<string, unknown>)[f.id];
+    if (raw === undefined || raw === null || raw === "") continue;
+    const newValue = typeof raw === "boolean" ? (raw ? "Confirmed" : "No") : String(raw);
+    const prevRaw = prev?.[f.id];
+    const oldValue =
+      prevRaw === undefined || prevRaw === null || prevRaw === ""
+        ? null
+        : typeof prevRaw === "boolean" ? (prevRaw ? "Confirmed" : "No") : String(prevRaw);
+    if (oldValue === newValue) continue; // unchanged — not part of the delta
+    changes.push({
+      fieldId: f.id,
+      label: (f.group ? f.group + " · " : "") + f.label,
+      group: f.group,
+      oldValue,
+      newValue,
+      prov: provInfo(event.provenance, f.id),
+      satisfiesGate: f.satisfiesGate,
+    });
+  }
+  return changes;
 }
 
 export function diffMeddic(

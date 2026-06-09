@@ -388,8 +388,26 @@ export interface DealEvent {
   from?: string; // stage moves
   to?: string;
   override?: boolean; // moved past unmet gates — leaves a visible flag
-  attachments?: { storageId: string; name: string; mime: string }[];
-  provenance?: Record<string, "manual" | "ai" | "ai-edited">;
+  attachments?: { storageId: string; name: string; mime: string; url?: string | null }[];
+  // Per-field provenance. Old events may hold the bare string form.
+  provenance?: Record<string, ProvenanceKind | ProvenanceInfo>;
+  // Verbatim pasted notes — the root evidence behind extracted values.
+  evidenceText?: string;
+}
+
+export type ProvenanceKind = "manual" | "ai" | "ai-edited";
+export interface ProvenanceInfo {
+  kind: ProvenanceKind;
+  quote?: string; // the evidence fragment the AI based the value on
+}
+
+export function provInfo(
+  prov: Record<string, ProvenanceKind | ProvenanceInfo> | undefined,
+  fieldId: string
+): ProvenanceInfo | null {
+  const raw = prov?.[fieldId];
+  if (!raw) return null;
+  return typeof raw === "string" ? { kind: raw } : raw;
 }
 
 export const SIM_START = "2026-01-05";
