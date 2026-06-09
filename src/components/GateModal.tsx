@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { STAGE_BY_ID, nextStageId } from "../../convex/pipeline";
+import { UserContext } from "../context";
 import type { DealRow } from "../App";
 
 interface Props {
@@ -16,6 +17,7 @@ export function GateModal({ row, asOf, onClose }: Props) {
   const nextId = nextStageId(state.stageId);
   const next = nextId ? STAGE_BY_ID[nextId] : null;
   const appendEvent = useMutation(api.deals.appendEvent);
+  const user = useContext(UserContext);
   const [busy, setBusy] = useState(false);
 
   if (!next) return null;
@@ -29,7 +31,7 @@ export function GateModal({ row, asOf, onClose }: Props) {
       await appendEvent({
         dealId: deal._id as never,
         at: asOf,
-        author: "Floris",
+        author: user.name,
         discipline: "Sales",
         type: "stage",
         from: stage.id,
@@ -60,10 +62,11 @@ export function GateModal({ row, asOf, onClose }: Props) {
           {stage.exitGates.map((g) => {
             const ev = state.gates[g.id];
             return (
-              <li key={g.id} className={ev ? "met" : "unmet"}>
+              <li key={g.id} className={ev ? "met" : "unmet"} style={{ flexWrap: "wrap" }}>
                 <span className="gate-check">{ev ? "✓" : ""}</span>
                 <span className="gate-label">{g.label}{g.cp && <em className="cp-mini">{g.cp}</em>}</span>
                 {ev ? <span className="gate-ev">{ev.at} · {ev.via}</span> : <span className="pill red">missing</span>}
+                {!ev && g.coach && <span className="gate-coach">{g.coach}</span>}
               </li>
             );
           })}

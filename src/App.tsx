@@ -3,7 +3,11 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { SIM_START, SIM_TODAY, STAGE_BY_ID } from "../convex/pipeline";
 import { replay, fmtEur, type DealState } from "../convex/derive";
+import type { AppUser } from "../convex/users";
 import type { Deal } from "./types";
+import { NavContext } from "./components/Markdown";
+import { Login } from "./components/Login";
+import { UserContext } from "./context";
 import { Board } from "./components/Board";
 import { RecordCard } from "./components/RecordCard";
 import { GateModal } from "./components/GateModal";
@@ -30,6 +34,9 @@ const PAGE_TITLES: Record<Page, string> = {
 };
 
 export default function App() {
+  const [user, setUser] = useState<AppUser | null>(() => {
+    try { return JSON.parse(localStorage.getItem("opprating-user") ?? "null") as AppUser | null; } catch { return null; }
+  });
   const [workspace, setWorkspace] = useState<string>(() => localStorage.getItem("opprating-ws") ?? "sim");
   useEffect(() => localStorage.setItem("opprating-ws", workspace), [workspace]);
 
@@ -93,7 +100,33 @@ export default function App() {
 
   const seeded = deals !== undefined && deals.length > 0;
 
+  if (!user) {
+    return (
+      <Login
+        onLogin={(u) => {
+          localStorage.setItem("opprating-user", JSON.stringify(u));
+          setUser(u);
+        }}
+      />
+    );
+  }
+
+  const nav = {
+    openDeal: (slug: string) => {
+      const row = rows.find((r) => r.deal.slug === slug || r.deal._id === slug);
+      if (row) setSelectedId(row.deal._id);
+    },
+    openMeddic: (slug: string) => {
+      setPage("clients");
+      setClientSlug(slug);
+      setSelectedId(null);
+    },
+    openLibrary: () => setPage("library"),
+  };
+
   return (
+    <UserContext.Provider value={user}>
+    <NavContext.Provider value={nav}>
     <div className="app">
       <aside className="sidebar">
         <div className="side-brand">
@@ -122,6 +155,17 @@ export default function App() {
         </button>
 
         <div className="side-foot">
+          <div className="side-user">
+            <span className="avatar">{user.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()}</span>
+            <span className="side-user-name">{user.name}<small>{user.role}</small></span>
+            <button
+              className="btn quiet tiny"
+              title="Sign out"
+              onClick={() => { localStorage.removeItem("opprating-user"); setUser(null); }}
+            >
+              ⇥
+            </button>
+          </div>
           {isSim && (
             <button
               className="btn quiet tiny"
@@ -228,6 +272,8 @@ export default function App() {
 
       <ChatDock asOf={asOf} workspace={workspace} />
     </div>
+    </NavContext.Provider>
+    </UserContext.Provider>
   );
 }
 

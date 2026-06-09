@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { TEMPLATE_BY_ID, STAGE_BY_ID } from "../../convex/pipeline";
+import { Md } from "./Markdown";
 import type { DealRow } from "../App";
 
 interface Msg {
@@ -148,7 +149,7 @@ export function GuidedChat({ row, templateId, onDone, onBack }: Props) {
       <div className="guided-body" ref={bodyRef}>
         {msgs.map((m, i) => (
           <div key={i} className={"msg " + (m.role === "user" ? "user" : "ai")}>
-            <pre>{m.text}</pre>
+            {m.role === "model" ? <Md text={m.text} /> : <pre>{m.text}</pre>}
           </div>
         ))}
         {busy && <div className="msg thinking">{recording ? "" : "thinking…"}</div>}

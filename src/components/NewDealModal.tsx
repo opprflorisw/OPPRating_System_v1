@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { TEAM } from "../../convex/pipeline";
+import { UserContext } from "../context";
+import { authorOptions } from "./UpdateModal";
 
 interface Props {
   workspace: string;
@@ -24,6 +25,7 @@ const CAPABILITIES = [
 // It enters at Lead — the staircase does the rest.
 export function NewDealModal({ workspace, today, onClose, onCreated }: Props) {
   const createDeal = useMutation(api.deals.createDeal);
+  const user = useContext(UserContext);
   const [account, setAccount] = useState("");
   const [site, setSite] = useState("");
   const [region, setRegion] = useState("NL");
@@ -32,7 +34,7 @@ export function NewDealModal({ workspace, today, onClose, onCreated }: Props) {
   const [hook, setHook] = useState("");
   const [acv, setAcv] = useState("");
   const [pocFee, setPocFee] = useState("25000");
-  const [owner, setOwner] = useState(TEAM[0]);
+  const [owner, setOwner] = useState(user.name);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,7 +105,7 @@ export function NewDealModal({ workspace, today, onClose, onCreated }: Props) {
             <label className="f-field">
               <span>Owner</span>
               <select value={owner} onChange={(e) => setOwner(e.target.value)}>
-                {TEAM.map((t) => <option key={t} value={t}>{t}</option>)}
+                {authorOptions(user.name).map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </label>
             <label className="f-field">

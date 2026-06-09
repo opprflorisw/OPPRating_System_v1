@@ -1,10 +1,16 @@
-import { useMemo, useRef, useState } from "react";
+import { useContext, useMemo, useRef, useState } from "react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { TEMPLATES, TEMPLATE_BY_ID, TEAM, type Template, type TemplateField } from "../../convex/pipeline";
+import { USERS } from "../../convex/users";
 import { meddicHistory } from "../../convex/derive";
 import { GuidedChat } from "./GuidedChat";
+import { UserContext } from "../context";
 import type { DealRow } from "../App";
+
+export function authorOptions(current: string): string[] {
+  return Array.from(new Set([current, ...USERS.map((u) => u.name), ...TEAM]));
+}
 
 interface Props {
   row: DealRow;
@@ -29,10 +35,11 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
     () => TEMPLATES.filter((t) => t.stages.includes(state.stageId) && t.id !== "disposition"),
     [state.stageId]
   );
+  const user = useContext(UserContext);
   const preselected = preselect ? TEMPLATE_BY_ID[preselect] : available.length === 1 ? available[0] : null;
   const [tpl, setTpl] = useState<Template | null>(preselected);
   const [step, setStep] = useState<Step>("mode");
-  const [author, setAuthor] = useState(TEAM[0]);
+  const [author, setAuthor] = useState(user.name);
   const [fields, setFields] = useState<Record<string, FieldState>>({});
   const [evidenceText, setEvidenceText] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -321,7 +328,7 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
               <div className="filed-by">
                 <span className="muted" style={{ fontSize: 12 }}>Filed by</span>
                 <select value={author} onChange={(e) => setAuthor(e.target.value)}>
-                  {TEAM.map((t) => <option key={t} value={t}>{t}</option>)}
+                  {authorOptions(user.name).map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <span className="spacer" />

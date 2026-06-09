@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { TEAM, STAGE_BY_ID } from "../../convex/pipeline";
+import { STAGE_BY_ID } from "../../convex/pipeline";
+import { UserContext } from "../context";
+import { authorOptions } from "./UpdateModal";
 import type { DealRow } from "../App";
 
 // Parking or losing a deal is a verdict, not a filing — its own modal,
@@ -12,8 +14,9 @@ export function DispositionModal({ row, asOf, onClose }: { row: DealRow; asOf: s
   const [kind, setKind] = useState<"Stagnated" | "Closed Lost">("Stagnated");
   const [reason, setReason] = useState("");
   const [detail, setDetail] = useState("");
+  const user = useContext(UserContext);
   const [reactivation, setReactivation] = useState("");
-  const [author, setAuthor] = useState(TEAM[0]);
+  const [author, setAuthor] = useState(user.name);
   const [busy, setBusy] = useState(false);
 
   const reasons =
@@ -75,7 +78,7 @@ export function DispositionModal({ row, asOf, onClose }: { row: DealRow; asOf: s
           <div className="filed-by">
             <span className="muted" style={{ fontSize: 12 }}>Decided by</span>
             <select value={author} onChange={(e) => setAuthor(e.target.value)}>
-              {TEAM.map((t) => <option key={t} value={t}>{t}</option>)}
+              {authorOptions(user.name).map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
         </div>

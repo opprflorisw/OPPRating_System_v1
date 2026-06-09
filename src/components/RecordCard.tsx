@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useContext, useMemo, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { UserContext } from "../context";
 import {
   BOARD_STAGES, STAGE_BY_ID, TEMPLATE_BY_ID, TEMPLATES, MEDDIC_LETTERS, nextStageId,
 } from "../../convex/pipeline";
@@ -34,6 +35,7 @@ export function RecordCard(props: Props) {
   const [reactivating, setReactivating] = useState(false);
   const next = nextStageId(state.stageId);
   const appendEvent = useMutation(api.deals.appendEvent);
+  const user = useContext(UserContext);
 
   // Where a parked deal would return to: the stage it paused from.
   const pausedFrom = stage.parking
@@ -46,7 +48,7 @@ export function RecordCard(props: Props) {
     try {
       await appendEvent({
         dealId: deal._id as never,
-        at: asOf, author: "Floris", discipline: "Sales", type: "stage",
+        at: asOf, author: user.name, discipline: "Sales", type: "stage",
         from: state.stageId, to: pausedFrom,
         note: `Reactivated from ${stage.name} back to ${STAGE_BY_ID[pausedFrom]?.name ?? pausedFrom}.`,
       });
@@ -256,7 +258,7 @@ function GatesTab({ row, asOf, live, onFileUpdate }: Props) {
 function GateRow({
   gate, entries, met, live, resolveTemplate, onResolve,
 }: {
-  gate: { id: string; label: string; cp?: string };
+  gate: { id: string; label: string; cp?: string; coach?: string };
   entries: GateEntry[] | undefined;
   met: boolean;
   live: boolean;
@@ -294,6 +296,7 @@ function GateRow({
 
       {open && (
         <div className="gate-detail">
+          {gate.coach && <p className="gate-coach" style={{ margin: "0 0 8px" }}>💡 {gate.coach}</p>}
           {!entries || entries.length === 0 ? (
             <p className="muted" style={{ margin: 0, fontSize: 12 }}>
               Nothing filed for this gate yet{live && resolveTemplate ? ` — file a ${TEMPLATE_BY_ID[resolveTemplate].name}.` : "."}
@@ -337,6 +340,7 @@ function GateRow({
 function ActivityTab({ row, asOf, live }: Props) {
   const { deal } = row;
   const appendEvent = useMutation(api.deals.appendEvent);
+  const user = useContext(UserContext);
   const [note, setNote] = useState("");
   const [openIdx, setOpenIdx] = useState<string | null>(null);
   const visible = deal.events.filter((e) => e.at <= asOf).slice().reverse();
@@ -353,7 +357,7 @@ function ActivityTab({ row, asOf, live }: Props) {
               if (e.key === "Enter" && note.trim()) {
                 await appendEvent({
                   dealId: deal._id as never,
-                  at: asOf, author: "Floris", discipline: "Sales", type: "note", note: note.trim(),
+                  at: asOf, author: user.name, discipline: "Sales", type: "note", note: note.trim(),
                 });
                 setNote("");
               }

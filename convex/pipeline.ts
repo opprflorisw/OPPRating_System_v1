@@ -15,6 +15,8 @@ export interface Gate {
   type: GateType;
   cp?: "CP1" | "CP2" | "CP3";
   hint?: string;
+  // What success looks like + the pitfall — fed to the AI coach and shown to users.
+  coach?: string;
 }
 
 export interface Stage {
@@ -43,8 +45,8 @@ export const STAGES: Stage[] = [
     purpose:
       "New lead from inbound, outbound, events or referrals. A deal does not enter Discovery until prep is done.",
     exitGates: [
-      { id: "prep_filed", label: "Pre-meeting prep filed (6-point self-check)", type: "check" },
-      { id: "meeting_booked", label: "First meeting booked with date", type: "date" },
+      { id: "prep_filed", label: "Pre-meeting prep filed (6-point self-check)", type: "check", coach: "Success = you could brief a colleague on this plant in 2 minutes: what they produce, where complexity sits, who's in the room and why each attendee cares. A bad first meeting produces bad pipeline — the manager spot-checks this before the deal converts." },
+      { id: "meeting_booked", label: "First meeting booked with date", type: "date", coach: "A real calendar date, not 'they'll come back to us'. No date = no deal." },
     ],
   },
   {
@@ -57,13 +59,13 @@ export const STAGES: Stage[] = [
     purpose:
       "Confirm structural ICP fit, urgency, pain and a Champion candidate. Multi-touch. MEDDIC light capture.",
     exitGates: [
-      { id: "core_problem", label: "Aligned on core problem", type: "text" },
-      { id: "urgency", label: "Urgency confirmed", type: "text" },
-      { id: "icp_fit", label: "ICP structural fit confirmed (250+ FTE, OE-aware, 3-10 sites)", type: "check" },
-      { id: "champion_candidate", label: "Champion candidate identified (HQ influence potential)", type: "contact" },
-      { id: "structured_next_step", label: "Agreement to structured next step, multiple stakeholders", type: "check" },
-      { id: "next_meeting", label: "Exact date for next meeting set", type: "date" },
-      { id: "insights_3", label: ">=3 insights per category (Problem / ICP / Decision / Champion / Objections / Interest)", type: "number" },
+      { id: "core_problem", label: "Aligned on core problem", type: "text", coach: "Success = the problem in THEIR words, tied to an operation (a line, a furnace, a stream), not generic industry pain. Test: would the customer nod if you read it back?" },
+      { id: "urgency", label: "Urgency confirmed", type: "text", coach: "Why NOW: a levy curve, a retirement date, a commissioning window, a reorganisation. 'They seem interested' is not urgency — urgency has a date or a euro attached." },
+      { id: "icp_fit", label: "ICP structural fit confirmed (250+ FTE, OE-aware, 3-10 sites)", type: "check", coach: "The pattern we sell into: variable input + operator judgment + expensive asset. If inputs are consistent and sensors already cover everything, disqualify now and save months." },
+      { id: "champion_candidate", label: "Champion candidate identified (HQ influence potential)", type: "contact", coach: "Name + role + why them. A great champion gives access, advocates internally and has HQ influence potential. Beware the tech-enthusiast who loves pilots but has never taken one to production." },
+      { id: "structured_next_step", label: "Agreement to structured next step, multiple stakeholders", type: "check", coach: "Multi-stakeholder is the point: one enthusiastic contact is a conversation, not a deal. Get the ops manager AND a second voice into the next session." },
+      { id: "next_meeting", label: "Exact date for next meeting set", type: "date", coach: "Always leave a meeting with the next one booked. Momentum dies in 'we'll find a slot'." },
+      { id: "insights_3", label: ">=3 insights per category (Problem / ICP / Decision / Champion / Objections / Interest)", type: "number", coach: "The insights log proves discovery depth. If Decision or Objections sit at 0-1, you've been pitching, not discovering — go back with questions." },
     ],
   },
   {
@@ -77,15 +79,15 @@ export const STAGES: Stage[] = [
       "Pre-POC alignment. Get to the Economic Buyer and qualify the ARR decision before any POC paper is written.",
     checkpoint: { id: "CP1", label: "Pre-POC MEDDIC review — mandatory, no exceptions" },
     exitGates: [
-      { id: "use_cases", label: "Main use cases agreed (~3) tied to operational pain", type: "text", cp: "CP1" },
-      { id: "success_criteria", label: "Success criteria co-signed by Champion AND EB", type: "check", cp: "CP1" },
-      { id: "poc_scope", label: "POC scope defined, 10-week target timeline", type: "check", cp: "CP1" },
-      { id: "champion_confirmed", label: "Champion confirmed (access, advocates, HQ influence)", type: "contact", cp: "CP1" },
-      { id: "poc_decision", label: "POC decision process mapped (EUR 25K pilot budget owner)", type: "text", cp: "CP1" },
-      { id: "arr_decision", label: "ARR decision process mapped (IC local/global or DM + sign-off)", type: "text", cp: "CP1" },
-      { id: "decision_driver", label: "Decision driver confirmed: Hours, % or EUR saved", type: "text", cp: "CP1" },
-      { id: "arr_pricing", label: "ARR pricing range socialised, blockers identified", type: "check", cp: "CP1" },
-      { id: "meddic_cp1", label: "Full MEDDIC attached + Last Reviewed date (CP1)", type: "date", cp: "CP1" },
+      { id: "use_cases", label: "Main use cases agreed (~3) tied to operational pain", type: "text", cp: "CP1", coach: "Around 3, each tied to a pain THEY named, each demonstrable in 10 weeks. More than 4 means no focus; one means no resilience if it underwhelms." },
+      { id: "success_criteria", label: "Success criteria co-signed by Champion AND EB", type: "check", cp: "CP1", coach: "The sharpest deal risk: define PoC success on what Oppr CONTROLS (decision latency, correlations surfaced, admin hours), never on KPIs we don't control (throughput, availability). Frame KPIs as trajectory + business case, not pass/fail — or one bad-feedstock month sinks a perfect PoC. And it must be co-signed by the EB, not just the champion." },
+      { id: "poc_scope", label: "POC scope defined, 10-week target timeline", type: "check", cp: "CP1", coach: "One line, 10 weeks, milestones written down. The PoC is a means to an end — it de-risks the ARR deal, it is not the product." },
+      { id: "champion_confirmed", label: "Champion confirmed (access, advocates, HQ influence)", type: "contact", cp: "CP1", coach: "Confirmed = has already DONE something: hosted a visit, briefed the EB, authored an internal document. Pressure-test: has this person ever taken a pilot to production? Multi-thread early — single-threaded deals die in summer." },
+      { id: "poc_decision", label: "POC decision process mapped (EUR 25K pilot budget owner)", type: "text", cp: "CP1", coach: "Who signs the EUR 25K, by name, and what they need to sign. 'The champion will arrange it' is not a process." },
+      { id: "arr_decision", label: "ARR decision process mapped (IC local/global or DM + sign-off)", type: "text", cp: "CP1", coach: "The REAL deal is the yearly contract — map its paper process now: IC local or global, thresholds, who signs above what. The classic failure: PoC path clear, license path unmapped, summer becomes a black hole." },
+      { id: "decision_driver", label: "Decision driver confirmed: Hours, % or EUR saved", type: "text", cp: "CP1", coach: "Ask the EB which currency convinces them — hours, percent or euros — and build every ROI conversation in that currency." },
+      { id: "arr_pricing", label: "ARR pricing range socialised, blockers identified", type: "check", cp: "CP1", coach: "Say the yearly number out loud BEFORE the PoC starts. If EUR 75K/yr is a problem, you want to know now, not in week 11." },
+      { id: "meddic_cp1", label: "Full MEDDIC attached + Last Reviewed date (CP1)", type: "date", cp: "CP1", coach: "No POC paper goes out without a full MEDDIC reviewed by the sales lead, EB in the room. Score every letter honestly — a 2 on E with a plan beats a flattering 4." },
     ],
   },
   {
@@ -99,15 +101,15 @@ export const STAGES: Stage[] = [
       "Validate technical fit on customer data (Oppr Lite, 10-week build). Build procurement runway in parallel.",
     checkpoint: { id: "CP2", label: "Post-POC MEDDIC refresh before Procurement" },
     exitGates: [
-      { id: "offer_signed", label: "POC offer signed + NDA", type: "check", cp: "CP2" },
-      { id: "po_received", label: "PO received (PDF preferred)", type: "check", cp: "CP2" },
-      { id: "workshop_date", label: "On-site workshop date set", type: "date" },
-      { id: "personas", label: "Personas captured: Plant/Ops, IT/Security, Procurement", type: "check" },
-      { id: "value_validated", label: "Oppr value validated against agreed success criteria", type: "check", cp: "CP2" },
-      { id: "it_security", label: "IT / security path confirmed by email", type: "check" },
-      { id: "roi_metric", label: "ROI calculated against EB's chosen metric (Hours / % / EUR)", type: "currency", cp: "CP2" },
-      { id: "procurement_engaged", label: "Procurement engaged, vendor onboarding started", type: "check" },
-      { id: "meddic_cp2", label: "MEDDIC refreshed against POC learnings (CP2)", type: "date", cp: "CP2" },
+      { id: "offer_signed", label: "POC offer signed + NDA", type: "check", cp: "CP2", coach: "The offer must reflect the pre-POC alignment: use cases, scope, ROI. If legal sits on it more than 2 weeks, escalate via the champion — paper delays kill momentum." },
+      { id: "po_received", label: "PO received (PDF preferred)", type: "check", cp: "CP2", coach: "Email confirmation works, a PDF PO is better. No PO = the organisation hasn't actually committed." },
+      { id: "workshop_date", label: "On-site workshop date set", type: "date", coach: "The on-site kickoff is where adoption starts. Get it on the calendar before the ink dries." },
+      { id: "personas", label: "Personas captured: Plant/Ops, IT/Security, Procurement", type: "check", coach: "Name the Technical Coach and a Floor User too — the people who decide whether it STICKS are rarely the people who signed." },
+      { id: "value_validated", label: "Oppr value validated against agreed success criteria", type: "check", cp: "CP2", coach: "Validated against the CO-SIGNED criteria, with the data to show it. Avoid the PoC trap: operations improve, everyone is happy, nobody agreed what a win was worth — no signature." },
+      { id: "it_security", label: "IT / security path confirmed by email", type: "check", coach: "In writing, even informally. EU-only data residency and tenant isolation answer most questions — get the objections out before procurement." },
+      { id: "roi_metric", label: "ROI calculated against EB's chosen metric (Hours / % / EUR)", type: "currency", cp: "CP2", coach: "In the EB's currency, with assumptions the customer validated. An ROI 'we' built alone motivates nobody to sign EUR 75K." },
+      { id: "procurement_engaged", label: "Procurement engaged, vendor onboarding started", type: "check", coach: "Ask 'can we get procurement involved now?' as early as the customer allows. Vendor onboarding takes weeks — run it parallel to the POC, not after." },
+      { id: "meddic_cp2", label: "MEDDIC refreshed against POC learnings (CP2)", type: "date", cp: "CP2", coach: "Refresh against what the POC taught you: competition surfaced? decision process still true? Scores should MOVE — identical scores after 10 weeks means nobody looked." },
     ],
   },
   {
@@ -121,12 +123,12 @@ export const STAGES: Stage[] = [
       "Negotiate the yearly contract. Commit forecast requires CP3: MEDDIC reviewed within 14 days.",
     checkpoint: { id: "CP3", label: "Pre-Commit: MEDDIC Last Reviewed <= 14 days" },
     exitGates: [
-      { id: "controlling", label: "Controlling approved", type: "check" },
-      { id: "ic_criteria", label: "IC criteria addressed in the deck", type: "check" },
-      { id: "final_pricing", label: "Final pricing agreed (at/above floor or finance sign-off)", type: "currency" },
-      { id: "legal_docs", label: "Legal docs closed: DPA, NDA, SLA, Master Contract", type: "check" },
-      { id: "signature_path", label: "Signature path confirmed (who signs, when, order)", type: "check" },
-      { id: "close_plan", label: "Mutual close-plan date agreed by Champion + EB", type: "date", cp: "CP3" },
+      { id: "controlling", label: "Controlling approved", type: "check", coach: "Finance has seen the number and nodded. If controlling hasn't been briefed, the IC meeting will be the first time they hear the price — bad place for surprises." },
+      { id: "ic_criteria", label: "IC criteria addressed in the deck", type: "check", coach: "The deck answers the committee's actual criteria, in their order, in the EB's currency. The champion presents it — make it effortless for them." },
+      { id: "final_pricing", label: "Final pricing agreed (at/above floor or finance sign-off)", type: "currency", coach: "At or above the floor, or get finance sign-off first. A discount nobody approved is a future fight." },
+      { id: "legal_docs", label: "Legal docs closed: DPA, NDA, SLA, Master Contract", type: "check", coach: "Track all four by name. The DPA security questionnaire is usually the long pole — chase it daily, it can slip an IC date." },
+      { id: "signature_path", label: "Signature path confirmed (who signs, when, order)", type: "check", coach: "Who signs, in what order, by when. Deals slip weeks because the second signer was on holiday and nobody knew." },
+      { id: "close_plan", label: "Mutual close-plan date agreed by Champion + EB", type: "date", cp: "CP3", coach: "MUTUAL means the customer wrote the date with you. Commit forecast requires MEDDIC reviewed within 14 days — a Commit on a stale MEDDIC is a guess wearing a suit." },
     ],
   },
   {

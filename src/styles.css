@@ -468,6 +468,54 @@ li.unmet .gate-label { color: var(--text-2); }
 .vh-row .lbl { font-weight: 600; }
 .vh-row .guide { color: var(--text-3); }
 
+/* ── Markdown ─────────────────────────────────────────────────────────── */
+.md { font-size: 13px; line-height: 1.6; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md h1, .md h2, .md h3, .md h4 { margin: 14px 0 6px; letter-spacing: -0.01em; }
+.md h3 { font-size: 13.5px; }
+.md h4 { font-size: 12.5px; }
+.md p { margin: 6px 0; }
+.md ul, .md ol { margin: 6px 0; padding-left: 20px; }
+.md li { margin: 2.5px 0; }
+.md strong { font-weight: 650; }
+.md a { color: var(--accent); text-decoration: none; border-bottom: 1px dashed var(--accent); cursor: pointer; }
+.md a:hover { background: var(--accent-soft); }
+.md table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 8px 0; }
+.md th, .md td { border: 1px solid var(--border); padding: 5px 8px; text-align: left; vertical-align: top; }
+.md th { background: var(--bg); font-weight: 600; }
+.md blockquote { margin: 8px 0; padding: 4px 12px; border-left: 3px solid var(--border-strong); color: var(--text-2); }
+.md code { font-family: var(--mono); font-size: 0.9em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+.md hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+.report-card { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--violet); border-radius: var(--r); padding: 14px 18px; }
+.report-tools { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.msg-ai-wrap { background: var(--surface-2); border-radius: 12px; border-bottom-left-radius: 4px; padding: 9px 13px; }
+.msg-tools { display: flex; justify-content: flex-end; margin-top: 4px; }
+
+.gate-coach { font-size: 11.5px; color: var(--text-2); font-style: italic; flex-basis: 100%; padding-left: 26px; }
+.gate-detail .gate-coach { padding-left: 0; }
+
+/* ── Login ────────────────────────────────────────────────────────────── */
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+.login-card {
+  width: min(380px, 92vw); background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; box-shadow: var(--shadow-pop); padding: 28px;
+}
+
+.side-user { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-top: 1px solid var(--border); }
+.side-user-name { flex: 1; font-size: 12.5px; font-weight: 600; line-height: 1.15; }
+.side-user-name small { display: block; font-weight: 400; font-size: 10.5px; color: var(--text-3); }
+
+.deal-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.deal-tab {
+  display: flex; align-items: center; font-family: var(--sans); font-size: 13px; font-weight: 500;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 7px 12px; cursor: pointer; color: var(--text-2);
+}
+.deal-tab:hover { border-color: var(--border-strong); color: var(--text); }
+.deal-tab.active { border-color: var(--accent); background: var(--accent-soft); color: var(--text); font-weight: 600; }
+
 /* ── Workspace switcher ───────────────────────────────────────────────── */
 .ws-switch {
   display: flex; gap: 3px; background: var(--surface-2); border-radius: var(--r-sm);

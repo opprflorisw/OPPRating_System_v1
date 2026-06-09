@@ -4,6 +4,7 @@ import { api } from "../../convex/_generated/api";
 import { STAGE_BY_ID, MEDDIC_LETTERS } from "../../convex/pipeline";
 import { fmtEur, meddicHistory, meddicPct, letterScore } from "../../convex/derive";
 import { initials } from "./RecordCard";
+import { Md, CopyButton, PrintButton } from "./Markdown";
 import type { DealRow } from "../App";
 
 interface Props {
@@ -77,19 +78,34 @@ function ClientDetail({ row, rows, asOf, workspace, live, onOpenClient, onOpenDe
   const { deal, state } = row;
   const history = meddicHistory(deal.events, asOf);
   const stage = STAGE_BY_ID[state.stageId];
+  const accountDeals = rows.filter((r) => r.deal.account === deal.account);
 
   return (
     <main className="page">
       <div className="page-head">
         <button className="btn quiet" onClick={() => onOpenClient(null)}>← Clients</button>
-        <h2>{deal.account} <span className="muted" style={{ fontWeight: 400 }}>{deal.site}</span></h2>
-        <span className="pill blue">{stage.name}</span>
-        <span className="pill outline mono">ACV {fmtEur(deal.acv)}</span>
+        <h2>{deal.account}</h2>
         <span style={{ flex: 1 }} />
         <button className="btn" onClick={() => onOpenDeal(deal._id)}>Open deal record</button>
         {live && !stage.terminal && !stage.parking && (
           <button className="btn primary" onClick={() => onNewSnapshot(row)}>New MEDDIC snapshot</button>
         )}
+      </div>
+
+      {/* One account can carry several deals — each with its own MEDDIC trail. */}
+      <div className="deal-tabs">
+        {accountDeals.map((r) => (
+          <button
+            key={r.deal._id}
+            className={"deal-tab" + (r.deal._id === deal._id ? " active" : "")}
+            onClick={() => onOpenClient(r.deal.slug)}
+          >
+            {r.deal.site}
+            <span className="pill blue" style={{ marginLeft: 7 }}>{STAGE_BY_ID[r.state.stageId].name}</span>
+            <span className="mono faint" style={{ marginLeft: 7, fontSize: 11 }}>{fmtEur(r.deal.acv)}</span>
+            {(() => { const h = meddicHistory(r.deal.events, asOf); return h.length > 0 ? <span className="mono faint" style={{ marginLeft: 7, fontSize: 11 }}>{h.length} snapshot{h.length > 1 ? "s" : ""}</span> : null; })()}
+          </button>
+        ))}
       </div>
 
       {history.length === 0 ? (
@@ -177,8 +193,10 @@ function ClientDetail({ row, rows, asOf, workspace, live, onOpenClient, onOpenDe
 
           <div className="panel">
             <h4>
-              AI read on this history
+              AI read on this account
               <span style={{ flex: 1 }} />
+              {analysis && <CopyButton text={analysis} />}
+              {analysis && <PrintButton text={analysis} title={`${deal.account} — MEDDIC analysis`} />}
               <button
                 className="btn ai tiny"
                 disabled={busy}
@@ -186,13 +204,18 @@ function ClientDetail({ row, rows, asOf, workspace, live, onOpenClient, onOpenDe
                   setBusy(true);
                   setAnalysis(null);
                   try {
+                    const others = accountDeals.filter((r) => r.deal._id !== deal._id).map((r) => `${r.deal.site} (slug ${r.deal.slug})`);
                     setAnalysis(
                       await askAi({
                         asOf,
                         workspace,
                         question:
-                          `Analyse the MEDDIC snapshot history for ${deal.account} (${deal.site}). ` +
-                          `What improved, what is structurally stuck (letters flat or low across snapshots), what is the single highest-leverage gap to fix now, and what does the trajectory say about whether this deal will close by its target? Use the scores and gaps in the data. Short, direct, no filler.`,
+                          `Analyse the MEDDIC snapshot history for the account ${deal.account}, focusing on the ${deal.site} deal (slug ${deal.slug})` +
+                          (others.length ? ` but covering ALL deals at this account: ${others.join(", ")} — compare them.` : ".") +
+                          ` Use EVERY snapshot in meddicSnapshotHistory, not just the latest. Structure: ` +
+                          `### What improved (letter deltas with numbers) · ### What is structurally stuck (letters flat or low across snapshots, and what that costs) · ` +
+                          `### The single highest-leverage gap to fix now (be concrete: who to call, what to ask) · ### Trajectory verdict (will it close by its target, and what the snapshot cadence says about deal hygiene). ` +
+                          `Link every deal you mention.`,
                       })
                     );
                   } finally {
@@ -203,27 +226,16 @@ function ClientDetail({ row, rows, asOf, workspace, live, onOpenClient, onOpenDe
                 {busy ? "Analysing…" : "✦ Analyse trajectory"}
               </button>
             </h4>
-            {analysis ? <pre className="report">{analysis}</pre> : (
-              <p className="muted" style={{ margin: 0 }}>What improved, what's structurally stuck, the highest-leverage gap. Uses every snapshot above.</p>
+            {analysis ? (
+              <div className="report-card"><Md text={analysis} /></div>
+            ) : (
+              <p className="muted" style={{ margin: 0 }}>
+                What improved, what's structurally stuck, the highest-leverage gap — across every snapshot of every deal at this account.
+              </p>
             )}
           </div>
         </>
       )}
-
-      <div className="panel">
-        <h4>Other deals at this account</h4>
-        {rows.filter((r) => r.deal.account === deal.account && r.deal._id !== deal._id).length === 0 ? (
-          <p className="muted" style={{ margin: 0 }}>None.</p>
-        ) : (
-          rows
-            .filter((r) => r.deal.account === deal.account && r.deal._id !== deal._id)
-            .map((r) => (
-              <button key={r.deal._id} className="btn quiet" onClick={() => onOpenClient(r.deal.slug)}>
-                {r.deal.site} — {STAGE_BY_ID[r.state.stageId].name} · {fmtEur(r.deal.acv)} →
-              </button>
-            ))
-        )}
-      </div>
     </main>
   );
 }

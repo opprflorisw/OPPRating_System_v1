@@ -13,10 +13,12 @@ import type * as deals from "../deals.js";
 import type * as derive from "../derive.js";
 import type * as extract from "../extract.js";
 import type * as files from "../files.js";
+import type * as gemini from "../gemini.js";
 import type * as guide from "../guide.js";
 import type * as library from "../library.js";
 import type * as pipeline from "../pipeline.js";
 import type * as scenarioData from "../scenarioData.js";
+import type * as users from "../users.js";
 
 import type {
   ApiFromModules,
@@ -30,10 +32,12 @@ declare const fullApi: ApiFromModules<{
   derive: typeof derive;
   extract: typeof extract;
   files: typeof files;
+  gemini: typeof gemini;
   guide: typeof guide;
   library: typeof library;
   pipeline: typeof pipeline;
   scenarioData: typeof scenarioData;
+  users: typeof users;
 }>;
 
 /**

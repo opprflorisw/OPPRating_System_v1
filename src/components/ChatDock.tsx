@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { Md, CopyButton } from "./Markdown";
 
 interface Msg {
   role: "user" | "ai";
@@ -58,7 +59,14 @@ export function ChatDock({ asOf, workspace }: { asOf: string; workspace: string 
             )}
             {msgs.map((m, i) => (
               <div key={i} className={"msg " + m.role}>
-                <pre>{m.text}</pre>
+                {m.role === "ai" ? (
+                  <div className="msg-ai-wrap">
+                    <Md text={m.text} />
+                    <div className="msg-tools"><CopyButton text={m.text} /></div>
+                  </div>
+                ) : (
+                  <pre>{m.text}</pre>
+                )}
               </div>
             ))}
             {busy && <div className="msg ai thinking">analysing the records…</div>}
