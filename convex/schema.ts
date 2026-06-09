@@ -28,5 +28,10 @@ export default defineSchema({
     from: v.optional(v.string()),
     to: v.optional(v.string()),
     override: v.optional(v.boolean()),
+    attachments: v.optional(
+      v.array(v.object({ storageId: v.string(), name: v.string(), mime: v.string() }))
+    ),
+    // Per-field provenance: "manual" | "ai" | "ai-edited"
+    provenance: v.optional(v.any()),
   }).index("by_deal", ["dealId"]),
 });

@@ -37,6 +37,10 @@ export const appendEvent = mutation({
     from: v.optional(v.string()),
     to: v.optional(v.string()),
     override: v.optional(v.boolean()),
+    attachments: v.optional(
+      v.array(v.object({ storageId: v.string(), name: v.string(), mime: v.string() }))
+    ),
+    provenance: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     await ctx.db.insert("events", args);

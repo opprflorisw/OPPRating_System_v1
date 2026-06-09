@@ -39,7 +39,7 @@ export function ChatDock({ asOf }: { asOf: string }) {
   return (
     <>
       <button className={"chat-fab" + (open ? " open" : "")} onClick={() => setOpen(!open)}>
-        {open ? "CLOSE ✕" : "ASK THE DATA"}
+        {open ? "✕ Close" : "✦ Ask the data"}
       </button>
       {open && (
         <div className="chat">
@@ -71,7 +71,7 @@ export function ChatDock({ asOf }: { asOf: string }) {
               onKeyDown={(e) => e.key === "Enter" && send(input)}
               disabled={busy}
             />
-            <button className="btn on" onClick={() => send(input)} disabled={busy}>→</button>
+            <button className="btn primary" onClick={() => send(input)} disabled={busy}>→</button>
           </footer>
         </div>
       )}

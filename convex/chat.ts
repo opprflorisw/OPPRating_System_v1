@@ -123,6 +123,31 @@ export const ask = action({
   },
 });
 
+// Monday stand-up brief — built on the DELTAS between this week and last week
+// (stage moves, MEDDIC letter changes, blockers opened/resolved), not on the
+// underlying templates.
+export const standup = action({
+  args: { asOf: v.string() },
+  handler: async (ctx, { asOf }): Promise<string> => {
+    const deals = (await ctx.runQuery(api.deals.list, {})) as unknown as DealWithEvents[];
+    const lastWeek = new Date(new Date(asOf).getTime() - 7 * 86400000).toISOString().slice(0, 10);
+    const now = buildContext(deals, asOf);
+    const prev = buildContext(deals, lastWeek);
+    return await callGemini(
+      SYSTEM,
+      `State LAST MONDAY (${lastWeek}):\n${prev}\n\nState TODAY (${asOf}):\n${now}\n\n` +
+        `Write the Monday morning stand-up brief for the sales leader, week starting ${asOf}. ` +
+        `Compare the two states and work from the CHANGES:\n` +
+        `1. One headline paragraph: how the week really went (honest, no cheerleading).\n` +
+        `2. "Moved": deals that progressed — stage moves, MEDDIC letters that improved (e.g. "EEW: E 2 -> 3"), gates passed.\n` +
+        `3. "Stalled or slipped": deals with no movement, scores flat or down, new blockers, rotting risk.\n` +
+        `4. "Blockers to break": each open blocker, who owns it, the suggested unblock.\n` +
+        `5. "The 3 conversations this week": the highest-leverage actions, each with a named deal and what to ask for.\n` +
+        `Keep it under 350 words. Plain language. EUR for money. Mark as SIMULATED DATA at the top.`
+    );
+  },
+});
+
 export const weeklyReview = action({
   args: { asOf: v.string() },
   handler: async (ctx, { asOf }): Promise<string> => {

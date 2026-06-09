@@ -195,7 +195,28 @@ export interface TemplateField {
   kind: "text" | "longtext" | "number" | "currency" | "date" | "select" | "check";
   options?: string[];
   satisfiesGate?: string; // gate id this field can satisfy when filled
+  group?: string; // visual grouping in the form (e.g. per MEDDIC letter)
+  hint?: string; // what good looks like — also fed to the AI extractor
 }
+
+// Who can file a record. Sim roster — today everything is Floris.
+export const TEAM = [
+  "Floris",
+  "Sales Exec (sim)",
+  "Forward Eng (sim)",
+  "Marketing (sim)",
+  "RevOps (sim)",
+];
+
+// The MEDDIC letters — single source for forms, record card and client page.
+export const MEDDIC_LETTERS = [
+  { key: "metrics", letter: "M", label: "Metrics / € case" },
+  { key: "eb", letter: "E", label: "Economic Buyer" },
+  { key: "criteria", letter: "D", label: "Decision criteria" },
+  { key: "process", letter: "D", label: "Decision process" },
+  { key: "pain", letter: "I", label: "Identified pain" },
+  { key: "champion", letter: "C", label: "Champion" },
+] as const;
 
 export interface Template {
   id: string;
@@ -212,14 +233,14 @@ export const TEMPLATES: Template[] = [
     name: "Pre-meeting prep",
     discipline: "Sales",
     stages: ["lead"],
-    description: "The 6-point self-check before the first meeting. Manager spot-checks before the deal converts to Discovery.",
+    description: "The prep standard before the first meeting. Content, not checkboxes — manager spot-checks before the deal converts to Discovery.",
     fields: [
-      { id: "produce", label: "I understand what they produce", kind: "check" },
-      { id: "complexity", label: "Production complexity assessed", kind: "check" },
-      { id: "attendees", label: "Role & background of every attendee known", kind: "check" },
-      { id: "news", label: "Recent company news reviewed", kind: "check" },
-      { id: "agenda", label: "Agenda sent in advance with hypotheses", kind: "check" },
-      { id: "success_def", label: "Meeting success defined, in writing", kind: "longtext", satisfiesGate: "prep_filed" },
+      { id: "produce", label: "What they produce", kind: "longtext", hint: "Products, lines, throughput. Show you understand the plant." },
+      { id: "complexity", label: "Production complexity — background", kind: "longtext", hint: "Input variability, process steps, where operator judgment matters." },
+      { id: "attendees", label: "Attendees — role & background", kind: "longtext", hint: "Name, role, what they care about, LinkedIn notes." },
+      { id: "news", label: "Recent company news", kind: "longtext", hint: "Announcements, results, investments, regulation hitting them." },
+      { id: "agenda", label: "Agenda sent, with hypotheses", kind: "longtext", hint: "The 2-3 hypotheses we want to validate in the meeting." },
+      { id: "success_def", label: "Meeting success defined, in writing", kind: "longtext", satisfiesGate: "prep_filed", hint: "What must be true after the meeting for it to have been worth it." },
       { id: "meeting_date", label: "First meeting date", kind: "date", satisfiesGate: "meeting_booked" },
     ],
   },
@@ -245,18 +266,31 @@ export const TEMPLATES: Template[] = [
     name: "MEDDIC snapshot",
     discipline: "Sales",
     stages: ["solution_validation", "poc", "negotiation"],
-    description: "One per open deal, the common language across sellers. Refreshing it stamps MEDDIC Last Reviewed (CP1/CP2/CP3).",
+    description: "The deal snapshot — the common language across sellers. Each letter gets the state, a 1-5 score and the gap. Refreshing it stamps MEDDIC Last Reviewed (CP1/CP2/CP3).",
     fields: [
-      { id: "metrics", label: "M — Metrics / EUR case", kind: "longtext" },
-      { id: "eb", label: "E — Economic Buyer (name, role, engaged?)", kind: "text" },
-      { id: "criteria", label: "D — Decision criteria", kind: "longtext" },
-      { id: "process", label: "D — Decision process (IC local/global, DM)", kind: "longtext", satisfiesGate: "arr_decision" },
-      { id: "pain", label: "I — Identified pain", kind: "longtext" },
-      { id: "champion", label: "C — Champion (strength)", kind: "text", satisfiesGate: "champion_confirmed" },
-      { id: "acv", label: "ACV (EUR)", kind: "currency" },
-      { id: "close_target", label: "Close target", kind: "date" },
-      { id: "next_step", label: "Next step", kind: "text" },
-      { id: "blocker", label: "Blocker", kind: "text" },
+      { id: "metrics", label: "State", kind: "longtext", group: "M — Metrics", hint: "The € / hours / % case. 5 = quantified in € and validated by the customer." },
+      { id: "metrics_score", label: "Score", kind: "select", options: ["1", "2", "3", "4", "5"], group: "M — Metrics" },
+      { id: "metrics_gap", label: "Gap", kind: "text", group: "M — Metrics" },
+      { id: "eb", label: "State", kind: "longtext", group: "E — Economic Buyer", hint: "Name, role, engaged or not. 5 = direct relationship, signs the ARR." },
+      { id: "eb_score", label: "Score", kind: "select", options: ["1", "2", "3", "4", "5"], group: "E — Economic Buyer" },
+      { id: "eb_gap", label: "Gap", kind: "text", group: "E — Economic Buyer" },
+      { id: "criteria", label: "State", kind: "longtext", group: "D — Decision criteria", hint: "5 = ranked and confirmed by the buyer, with a € threshold for success." },
+      { id: "criteria_score", label: "Score", kind: "select", options: ["1", "2", "3", "4", "5"], group: "D — Decision criteria" },
+      { id: "criteria_gap", label: "Gap", kind: "text", group: "D — Decision criteria" },
+      { id: "process", label: "State", kind: "longtext", group: "D — Decision process", satisfiesGate: "arr_decision", hint: "POC path AND the ARR paper process. 5 = both mapped with dates." },
+      { id: "process_score", label: "Score", kind: "select", options: ["1", "2", "3", "4", "5"], group: "D — Decision process" },
+      { id: "process_gap", label: "Gap", kind: "text", group: "D — Decision process" },
+      { id: "pain", label: "State", kind: "longtext", group: "I — Identified pain", hint: "5 = pain in money and personal to a named stakeholder." },
+      { id: "pain_score", label: "Score", kind: "select", options: ["1", "2", "3", "4", "5"], group: "I — Identified pain" },
+      { id: "pain_gap", label: "Gap", kind: "text", group: "I — Identified pain" },
+      { id: "champion", label: "State", kind: "longtext", group: "C — Champion", satisfiesGate: "champion_confirmed", hint: "5 = multi-threaded, proven track record taking pilots to production." },
+      { id: "champion_score", label: "Score", kind: "select", options: ["1", "2", "3", "4", "5"], group: "C — Champion" },
+      { id: "champion_gap", label: "Gap", kind: "text", group: "C — Champion" },
+      { id: "verdict", label: "Verdict — one honest line", kind: "longtext", group: "Overall" },
+      { id: "acv", label: "ACV (EUR)", kind: "currency", group: "Overall" },
+      { id: "close_target", label: "Close target", kind: "date", group: "Overall" },
+      { id: "next_step", label: "Next step", kind: "text", group: "Overall" },
+      { id: "blocker", label: "Blocker", kind: "text", group: "Overall" },
     ],
   },
   {
@@ -354,6 +388,8 @@ export interface DealEvent {
   from?: string; // stage moves
   to?: string;
   override?: boolean; // moved past unmet gates — leaves a visible flag
+  attachments?: { storageId: string; name: string; mime: string }[];
+  provenance?: Record<string, "manual" | "ai" | "ai-edited">;
 }
 
 export const SIM_START = "2026-01-05";
