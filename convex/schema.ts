@@ -17,6 +17,12 @@ export default defineSchema({
     owner: v.string(),
   }).index("by_slug", ["slug"]),
 
+  // Single-document dynamic pipeline setup (stages, gates, templates).
+  blueprint: defineTable({
+    data: v.any(),
+    updatedAt: v.string(),
+  }),
+
   events: defineTable({
     dealId: v.id("deals"),
     at: v.string(), // ISO date, sim time

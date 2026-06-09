@@ -17,6 +17,9 @@ export interface Gate {
   hint?: string;
   // What success looks like + the pitfall — fed to the AI coach and shown to users.
   coach?: string;
+  // Auto-assigned requirement number, e.g. "D3" = Discovery gate 3. Stable
+  // identifier across the board, chat, modals and the Process page.
+  code?: string;
 }
 
 export interface Stage {
@@ -34,7 +37,7 @@ export interface Stage {
   parking?: boolean;
 }
 
-export const STAGES: Stage[] = [
+export const DEFAULT_STAGES: Stage[] = [
   {
     id: "lead",
     name: "Lead",
@@ -169,11 +172,15 @@ export const STAGES: Stage[] = [
   },
 ];
 
-export const STAGE_BY_ID: Record<string, Stage> = Object.fromEntries(
-  STAGES.map((s) => [s.id, s])
-);
+// Live registries — filled by applyBlueprint() at the bottom of this file,
+// from the defaults or from the DB-stored blueprint. Mutated in place so
+// every consumer (frontend and Convex actions) reads the same active setup.
+export const STAGES: Stage[] = [];
+export const STAGE_BY_ID: Record<string, Stage> = {};
 
-export const BOARD_STAGES = STAGES.filter((s) => !s.parking);
+export function boardStages(): Stage[] {
+  return STAGES.filter((s) => !s.parking);
+}
 
 export function nextStageId(stageId: string): string | null {
   const s = STAGE_BY_ID[stageId];
@@ -229,7 +236,7 @@ export interface Template {
   fields: TemplateField[];
 }
 
-export const TEMPLATES: Template[] = [
+export const DEFAULT_TEMPLATES: Template[] = [
   {
     id: "prep",
     name: "Pre-meeting prep",
@@ -267,8 +274,8 @@ export const TEMPLATES: Template[] = [
     id: "meddic_snapshot",
     name: "MEDDIC snapshot",
     discipline: "Sales",
-    stages: ["solution_validation", "poc", "negotiation"],
-    description: "The deal snapshot — the common language across sellers. Each letter gets the state, a 1-5 score and the gap. Refreshing it stamps MEDDIC Last Reviewed (CP1/CP2/CP3).",
+    stages: ["discovery", "solution_validation", "poc", "negotiation"],
+    description: "The deal snapshot — the common language across sellers. Starts LIGHT at Discovery (pain, champion candidate, metrics floated), becomes the full scored review at CP1, refreshed at CP2/CP3. Each letter gets the state, a 1-5 score and the gap.",
     fields: [
       { id: "metrics", label: "State", kind: "longtext", group: "M — Metrics", hint: "The € / hours / % case. 5 = quantified in € and validated by the customer." },
       { id: "metrics_score", label: "Score", kind: "select", options: ["1", "2", "3", "4", "5"], group: "M — Metrics" },
@@ -370,9 +377,37 @@ export const TEMPLATES: Template[] = [
   },
 ];
 
-export const TEMPLATE_BY_ID: Record<string, Template> = Object.fromEntries(
-  TEMPLATES.map((t) => [t.id, t])
-);
+export const TEMPLATES: Template[] = [];
+export const TEMPLATE_BY_ID: Record<string, Template> = {};
+
+const GATE_PREFIX: Record<string, string> = {
+  lead: "L", discovery: "D", solution_validation: "SV", poc: "P",
+  negotiation: "N", closed_won: "W", stagnated: "X", closed_lost: "X",
+};
+
+export interface Blueprint {
+  stages: Stage[];
+  templates: Template[];
+}
+
+// Load a blueprint (or the defaults) into the live registries and number
+// every gate. Called at module init, again whenever the DB blueprint loads
+// or changes, and at the start of every Convex action that needs the setup.
+export function applyBlueprint(bp?: Partial<Blueprint> | null): void {
+  STAGES.length = 0;
+  STAGES.push(...((bp?.stages && bp.stages.length ? bp.stages : DEFAULT_STAGES) as Stage[]));
+  TEMPLATES.length = 0;
+  TEMPLATES.push(...((bp?.templates && bp.templates.length ? bp.templates : DEFAULT_TEMPLATES) as Template[]));
+  for (const k of Object.keys(STAGE_BY_ID)) delete STAGE_BY_ID[k];
+  for (const s of STAGES) {
+    STAGE_BY_ID[s.id] = s;
+    s.exitGates.forEach((g, i) => { g.code = `${GATE_PREFIX[s.id] ?? "G"}${i + 1}`; });
+  }
+  for (const k of Object.keys(TEMPLATE_BY_ID)) delete TEMPLATE_BY_ID[k];
+  for (const t of TEMPLATES) TEMPLATE_BY_ID[t.id] = t;
+}
+
+applyBlueprint();
 
 // ============================================================================
 // Event model — the record card is an append-only event log.

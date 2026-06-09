@@ -31,8 +31,12 @@ interface FieldState {
 
 export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
   const { deal, state } = row;
+  // The stage's own template first; MEDDIC and cross-stage templates after.
   const available = useMemo(
-    () => TEMPLATES.filter((t) => t.stages.includes(state.stageId) && t.id !== "disposition"),
+    () =>
+      TEMPLATES.filter((t) => t.stages.includes(state.stageId) && t.id !== "disposition")
+        .slice()
+        .sort((a, b) => (a.stages[0] === state.stageId ? 0 : 1) - (b.stages[0] === state.stageId ? 0 : 1)),
     [state.stageId]
   );
   const user = useContext(UserContext);
@@ -351,14 +355,14 @@ function FormFields({
   let lastGroup: string | undefined;
   return (
     <div className="props">
-      {tpl.fields.map((f) => {
+      {tpl.fields.map((f, i) => {
         const head = f.group !== lastGroup ? f.group : undefined;
         lastGroup = f.group;
         const fs = fields[f.id] ?? { value: f.kind === "check" ? false : "", provenance: "manual" as Provenance, accepted: true };
         return (
           <div key={f.id}>
             {head && <div className="group-head">{head}</div>}
-            <FieldRow field={f} fs={fs} setField={setField} />
+            <FieldRow field={f} index={i + 1} fs={fs} setField={setField} />
           </div>
         );
       })}
@@ -366,13 +370,14 @@ function FormFields({
   );
 }
 
-function FieldRow({ field, fs, setField }: { field: TemplateField; fs: FieldState; setField: (id: string, patch: Partial<FieldState>) => void }) {
+function FieldRow({ field, index, fs, setField }: { field: TemplateField; index: number; fs: FieldState; setField: (id: string, patch: Partial<FieldState>) => void }) {
   const onChange = (v: string | boolean) =>
     setField(field.id, { value: v, provenance: fs.provenance === "ai" ? "ai-edited" : fs.provenance });
   return (
     <div className={"prop" + (fs.accepted ? "" : " rejected")}>
       <div className="prop-head">
         <span className="prop-label">
+          <span className="mono faint" style={{ marginRight: 6 }}>{index}.</span>
           {field.label}
           {field.satisfiesGate && " ⛩"}
         </span>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BOARD_STAGES, STAGES, STAGE_BY_ID, nextStageId } from "../../convex/pipeline";
+import { boardStages, STAGES, STAGE_BY_ID, nextStageId } from "../../convex/pipeline";
 import { gateProgress, fmtEur } from "../../convex/derive";
 import type { DealRow } from "../App";
 
@@ -16,7 +16,7 @@ export function Board({ rows, live, onSelect, onRequestMove }: Props) {
 
   return (
     <main className="board">
-      {BOARD_STAGES.map((stage) => {
+      {boardStages().map((stage) => {
         const inStage = rows.filter((r) => r.state.stageId === stage.id);
         const sum = inStage.reduce((a, r) => a + r.deal.acv, 0);
         const dragRow = rows.find((r) => r.deal._id === dragId);

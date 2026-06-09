@@ -6,8 +6,9 @@
 // ============================================================================
 
 import { action } from "./_generated/server";
+import { api } from "./_generated/api";
 import { v } from "convex/values";
-import { TEMPLATE_BY_ID, STAGE_BY_ID } from "./pipeline";
+import { TEMPLATE_BY_ID, STAGE_BY_ID, applyBlueprint } from "./pipeline";
 import { geminiGenerate, transcribeAudio, parseJsonLoose, toBase64 } from "./gemini";
 
 export interface Proposal {
@@ -27,6 +28,8 @@ export const extract = action({
     fileIds: v.optional(v.array(v.id("_storage"))),
   },
   handler: async (ctx, { templateId, stageId, account, text, fileIds }): Promise<Proposal[]> => {
+    const bp = await ctx.runQuery(api.blueprint.get, {});
+    applyBlueprint((bp?.data as never) ?? null);
     const template = TEMPLATE_BY_ID[templateId];
     if (!template) throw new Error(`Unknown template ${templateId}`);
     const stage = STAGE_BY_ID[stageId];

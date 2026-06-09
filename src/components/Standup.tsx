@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { STAGE_BY_ID, MEDDIC_LETTERS } from "../../convex/pipeline";
+import { STAGE_BY_ID, MEDDIC_LETTERS, boardStages } from "../../convex/pipeline";
 import { replay, fmtEur, meddicHistory, letterScore, meddicPct } from "../../convex/derive";
 import { Md, CopyButton, PrintButton } from "./Markdown";
 import type { DealRow } from "../App";

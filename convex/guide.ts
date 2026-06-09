@@ -8,8 +8,9 @@
 // ============================================================================
 
 import { action } from "./_generated/server";
+import { api } from "./_generated/api";
 import { v } from "convex/values";
-import { TEMPLATE_BY_ID, STAGE_BY_ID } from "./pipeline";
+import { TEMPLATE_BY_ID, STAGE_BY_ID, applyBlueprint } from "./pipeline";
 import { MEDDIC_RUBRIC, PRINCIPLES } from "./library";
 import { geminiGenerate, transcribeAudio, parseJsonLoose } from "./gemini";
 
@@ -34,6 +35,8 @@ export const step = action({
     finish: v.optional(v.boolean()),
   },
   handler: async (ctx, args): Promise<GuideTurn> => {
+    const bp = await ctx.runQuery(api.blueprint.get, {});
+    applyBlueprint((bp?.data as never) ?? null);
     const template = TEMPLATE_BY_ID[args.templateId];
     const stage = STAGE_BY_ID[args.stageId];
     const prevCollected = (args.collected as Record<string, string>) ?? {};
@@ -64,7 +67,7 @@ export const step = action({
         kind: f.kind,
         options: f.options,
         hint: f.hint,
-        satisfiesGate: gate?.label,
+        satisfiesGate: gate ? `${gate.code} — ${gate.label}` : undefined,
         successCriteria: gate?.coach,
       };
     });
@@ -91,7 +94,10 @@ export const step = action({
       `and go straight to what is STILL MISSING. Only touch a satisfied field if the user volunteers new information about it.\n` +
       `- If the context says ALL exit gates are met, open by saying the stage is complete and the user can advance — ` +
       `then offer to capture anything new. Do not interview for the sake of it.\n` +
-      `- Ask 2-3 RELATED fields at a time (use the field groups). Never dump the whole list.\n` +
+      `- Ask ONE question at a time. You may pair two tightly-linked fields in a single question, never more. ` +
+      `Sound like a colleague on a call, not a form: react in half a sentence to what was just said, then ask the next thing.\n` +
+      `- Requirements are numbered (the gate codes like D3 or SV5). When you reference a requirement, cite its code in ` +
+      `parentheses so the user can follow along against the gate list, e.g. "...the urgency **(D2)**".\n` +
       `- COACH as you ask: when a field has successCriteria, weave in what success looks like, briefly. ` +
       `Example: instead of "What are the success criteria?", say "What did you agree success looks like? ` +
       `**Tip:** define it on what Oppr controls (decision latency, hours saved), never on KPIs we don't control — that's the classic PoC trap."\n` +

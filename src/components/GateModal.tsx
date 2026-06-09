@@ -63,6 +63,7 @@ export function GateModal({ row, asOf, onClose }: Props) {
             const ev = state.gates[g.id];
             return (
               <li key={g.id} className={ev ? "met" : "unmet"} style={{ flexWrap: "wrap" }}>
+                <span className="gate-code mono">{g.code}</span>
                 <span className="gate-check">{ev ? "✓" : ""}</span>
                 <span className="gate-label">{g.label}{g.cp && <em className="cp-mini">{g.cp}</em>}</span>
                 {ev ? <span className="gate-ev">{ev.at} · {ev.via}</span> : <span className="pill red">missing</span>}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../convex/_generated/api";
-import { SIM_START, SIM_TODAY, STAGE_BY_ID } from "../convex/pipeline";
+import { SIM_START, SIM_TODAY, STAGE_BY_ID, applyBlueprint } from "../convex/pipeline";
 import { replay, fmtEur, type DealState } from "../convex/derive";
 import type { AppUser } from "../convex/users";
 import type { Deal } from "./types";
@@ -17,6 +17,7 @@ import { NewDealModal } from "./components/NewDealModal";
 import { Clients } from "./components/Clients";
 import { Standup } from "./components/Standup";
 import { Library } from "./components/Library";
+import { Process } from "./components/Process";
 import { ChatDock } from "./components/ChatDock";
 
 export interface DealRow {
@@ -24,12 +25,13 @@ export interface DealRow {
   state: DealState;
 }
 
-type Page = "pipeline" | "clients" | "standup" | "library";
+type Page = "pipeline" | "clients" | "standup" | "process" | "library";
 
 const PAGE_TITLES: Record<Page, string> = {
   pipeline: "Pipeline",
   clients: "Clients",
   standup: "Monday Stand-up",
+  process: "Process",
   library: "Library",
 };
 
@@ -42,6 +44,14 @@ export default function App() {
 
   const deals = useQuery(api.deals.list, { workspace }) as Deal[] | undefined;
   const resetScenario = useMutation(api.deals.resetScenario);
+
+  // The dynamic blueprint: when a DB-stored setup exists it overrides the
+  // defaults. Applied synchronously into the shared registries before render.
+  const bpDoc = useQuery(api.blueprint.get, {});
+  const bpVersion = useMemo(() => {
+    applyBlueprint((bpDoc?.data as never) ?? null);
+    return bpDoc ? `${bpDoc._id}:${bpDoc.updatedAt}` : "defaults";
+  }, [bpDoc]);
 
   const isSim = workspace === "sim";
   const realToday = new Date().toISOString().slice(0, 10);
@@ -68,7 +78,8 @@ export default function App() {
   const live = asOf === today;
   const rows: DealRow[] = useMemo(
     () => (deals ?? []).map((deal) => ({ deal, state: replay(deal.events, deal.acv, asOf) })),
-    [deals, asOf]
+    // bpVersion: replay depends on the active blueprint's gates/templates.
+    [deals, asOf, bpVersion]
   );
   const selected = rows.find((r) => r.deal._id === selectedId) ?? null;
 
@@ -147,6 +158,7 @@ export default function App() {
           <NavItem icon={<IconBoard />} label="Pipeline" active={page === "pipeline"} onClick={() => setPage("pipeline")} />
           <NavItem icon={<IconPeople />} label="Clients" active={page === "clients"} onClick={() => setPage("clients")} />
           <NavItem icon={<IconPulse />} label="Monday Stand-up" active={page === "standup"} onClick={() => setPage("standup")} />
+          <NavItem icon={<IconFlow />} label="Process" active={page === "process"} onClick={() => setPage("process")} />
           <NavItem icon={<IconBook />} label="Library" active={page === "library"} onClick={() => setPage("library")} />
         </nav>
 
@@ -238,6 +250,8 @@ export default function App() {
             />
           ) : page === "standup" ? (
             <Standup rows={rows} asOf={asOf} workspace={workspace} />
+          ) : page === "process" ? (
+            <Process key={bpVersion} />
           ) : (
             <Library />
           )}
@@ -310,6 +324,16 @@ function IconPulse() {
   return (
     <svg viewBox="0 0 16 16" {...sw}>
       <path d="M1.5 8.5h3l1.5-4 3 7 1.5-3h4" />
+    </svg>
+  );
+}
+function IconFlow() {
+  return (
+    <svg viewBox="0 0 16 16" {...sw}>
+      <circle cx="3" cy="8" r="1.8" />
+      <circle cx="13" cy="3.5" r="1.8" />
+      <circle cx="13" cy="12.5" r="1.8" />
+      <path d="M4.8 7.2 11.2 4M4.8 8.8l6.4 3.2" />
     </svg>
   );
 }

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as blueprint from "../blueprint.js";
 import type * as chat from "../chat.js";
 import type * as deals from "../deals.js";
 import type * as derive from "../derive.js";
@@ -27,6 +28,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  blueprint: typeof blueprint;
   chat: typeof chat;
   deals: typeof deals;
   derive: typeof derive;

@@ -10,8 +10,13 @@ import { action } from "./_generated/server";
 import { api } from "./_generated/api";
 import { v } from "convex/values";
 import { replay, gateProgress, meddicHistory, meddicPct, letterScore } from "./derive";
-import { STAGE_BY_ID, MEDDIC_LETTERS, type DealEvent } from "./pipeline";
+import { STAGE_BY_ID, MEDDIC_LETTERS, applyBlueprint, type DealEvent } from "./pipeline";
 import { geminiGenerate } from "./gemini";
+
+async function loadBlueprint(ctx: { runQuery: (q: never, a: never) => Promise<unknown> }) {
+  const bp = (await ctx.runQuery(api.blueprint.get as never, {} as never)) as { data?: unknown } | null;
+  applyBlueprint((bp?.data as never) ?? null);
+}
 
 const SYSTEM = `You are the RevOps analyst inside the OPPRating System, the commercial
 engine of Oppr B.V. (the Human Data Layer for Manufacturing — LOGS captures operator
@@ -129,6 +134,7 @@ function simNote(workspace?: string): string {
 export const ask = action({
   args: { question: v.string(), asOf: v.string(), workspace: v.optional(v.string()) },
   handler: async (ctx, { question, asOf, workspace }): Promise<string> => {
+    await loadBlueprint(ctx as never);
     const deals = (await ctx.runQuery(api.deals.list, { workspace })) as unknown as DealWithEvents[];
     const context = buildContext(deals, asOf);
     return await run(
@@ -142,6 +148,7 @@ export const ask = action({
 export const standup = action({
   args: { asOf: v.string(), workspace: v.optional(v.string()) },
   handler: async (ctx, { asOf, workspace }): Promise<string> => {
+    await loadBlueprint(ctx as never);
     const deals = (await ctx.runQuery(api.deals.list, { workspace })) as unknown as DealWithEvents[];
     const lastWeek = new Date(new Date(asOf).getTime() - 7 * 86400000).toISOString().slice(0, 10);
     const now = buildContext(deals, asOf);
@@ -164,6 +171,7 @@ export const standup = action({
 export const weeklyReview = action({
   args: { asOf: v.string(), workspace: v.optional(v.string()) },
   handler: async (ctx, { asOf, workspace }): Promise<string> => {
+    await loadBlueprint(ctx as never);
     const deals = (await ctx.runQuery(api.deals.list, { workspace })) as unknown as DealWithEvents[];
     const context = buildContext(deals, asOf);
     return await run(

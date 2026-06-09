@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { TEMPLATE_BY_ID, STAGE_BY_ID, nextStageId } from "../../convex/pipeline";
+import { TEMPLATE_BY_ID, TEMPLATES, STAGE_BY_ID, nextStageId } from "../../convex/pipeline";
 import { gateLedger } from "../../convex/derive";
 import { Md } from "./Markdown";
 import type { DealRow } from "../App";
@@ -67,18 +67,19 @@ export function GuidedChat({ row, templateId, asOf, onDone, onBack }: Props) {
     const satisfied = fieldStatus.filter((fs) => fs.gateMet);
     const missingGateFields = fieldStatus.filter((fs) => fs.field.satisfiesGate && !fs.gateMet);
     const known = fieldStatus.filter((fs) => !fs.field.satisfiesGate && fs.currentValue);
+    const gateOf = (fs: (typeof fieldStatus)[number]) => stage.exitGates.find((g) => g.id === fs.field.satisfiesGate);
     if (satisfied.length) {
       bits.push(
-        `ALREADY ON FILE — these fields' gates are ALREADY SATISFIED, do NOT ask about them again:\n` +
+        `ALREADY ON FILE — these gates are ALREADY SATISFIED, do NOT ask about them again:\n` +
           satisfied
-            .map((fs) => `- ${fs.field.label} [gate met ${fs.satisfiedAt ?? ""}]: ${String(fs.currentValue ?? "confirmed").slice(0, 200)}`)
+            .map((fs) => `- (${gateOf(fs)?.code}) ${fs.field.label} [met ${fs.satisfiedAt ?? ""}]: ${String(fs.currentValue ?? "confirmed").slice(0, 200)}`)
             .join("\n")
       );
     }
     if (missingGateFields.length) {
       bits.push(
-        `STILL MISSING — these are the gates this interview must fill:\n` +
-          missingGateFields.map((fs) => `- ${fs.field.label} (gate: ${stage.exitGates.find((g) => g.id === fs.field.satisfiesGate)?.label ?? fs.field.satisfiesGate})`).join("\n")
+        `STILL MISSING — these numbered gates are what this interview must fill:\n` +
+          missingGateFields.map((fs) => `- (${gateOf(fs)?.code}) ${gateOf(fs)?.label ?? fs.field.label}`).join("\n")
       );
     } else {
       const next = nextStageId(state.stageId);
@@ -178,28 +179,43 @@ export function GuidedChat({ row, templateId, asOf, onDone, onBack }: Props) {
     }
   };
 
-  const total = template.fields.length;
-  const got = template.fields.filter((f) => collected[f.id] !== undefined).length;
-  const gateChips = fieldStatus.filter((fs) => fs.field.satisfiesGate);
-  const gateLabel = (fs: (typeof fieldStatus)[number]) => {
-    const g = stage.exitGates.find((x) => x.id === fs.field.satisfiesGate);
-    const label = g?.label ?? fs.field.label;
-    return label.length > 38 ? label.slice(0, 37) + "…" : label;
-  };
+  // Progress measured against the STAGE's gates — the same ruler as the
+  // board and the record card, so the numbers always match.
+  const stageGates = stage.exitGates.map((g) => {
+    const met = Boolean(state.gates[g.id]);
+    const fillField = template.fields.find((f) => f.satisfiesGate === g.id);
+    const captured = !met && fillField ? collected[fillField.id] !== undefined : false;
+    const otherTpl = !fillField
+      ? TEMPLATES.find((t) => t.id !== template.id && t.stages.includes(state.stageId) && t.fields.some((f) => f.satisfiesGate === g.id))
+      : undefined;
+    return { gate: g, met, captured, fillableHere: Boolean(fillField), otherTpl };
+  });
+  const metCount = stageGates.filter((x) => x.met).length;
+  const capturedCount = stageGates.filter((x) => x.captured).length;
+  const answers = template.fields.filter((f) => collected[f.id] !== undefined).length;
+  const short = (s: string) => (s.length > 34 ? s.slice(0, 33) + "…" : s);
 
   return (
     <div className="guided">
       <div className="guided-progress">
-        <div className="gauge"><div className="gauge-fill" style={{ width: total ? (got / total) * 100 + "%" : "0%" }} /></div>
-        <span className="mono faint" style={{ fontSize: 11 }}>{got}/{total} fields this session</span>
+        <div className="gauge">
+          <div className="gauge-fill" style={{ width: stageGates.length ? ((metCount + capturedCount) / stageGates.length) * 100 + "%" : "0%" }} />
+        </div>
+        <span className="mono faint" style={{ fontSize: 11 }}>
+          {metCount + capturedCount}/{stageGates.length} {stage.name} gates · {answers} answer{answers === 1 ? "" : "s"} this session
+        </span>
       </div>
       <div className="guided-gates">
-        {gateChips.map((fs) => {
-          const captured = collected[fs.field.id] !== undefined;
-          const cls = fs.gateMet ? "done-before" : captured ? "captured" : "open";
+        {stageGates.map(({ gate, met, captured, fillableHere, otherTpl }) => {
+          const cls = met ? "done-before" : captured ? "captured" : fillableHere ? "open" : "elsewhere";
+          const title = met
+            ? `${gate.code} · already satisfied`
+            : fillableHere
+              ? `${gate.code} · ${gate.label}`
+              : `${gate.code} · filled via ${otherTpl?.name ?? "another template"}`;
           return (
-            <span key={fs.field.id} className={"gate-chip " + cls} title={fs.gateMet ? `Already satisfied ${fs.satisfiedAt ?? ""}: ${fs.currentValue ?? ""}` : fs.field.label}>
-              {fs.gateMet ? "✓" : captured ? "✦" : "○"} {gateLabel(fs)}
+            <span key={gate.id} className={"gate-chip " + cls} title={title}>
+              <b className="mono">{gate.code}</b> {met ? "✓" : captured ? "✦" : "○"} {short(gate.label)}
             </span>
           );
         })}
@@ -232,8 +248,8 @@ export function GuidedChat({ row, templateId, asOf, onDone, onBack }: Props) {
       <footer className="modal-foot">
         <button className="btn quiet" onClick={onBack} disabled={busy}>← Mode</button>
         <span className="spacer" />
-        <button className="btn" onClick={() => runStep({ finish: true })} disabled={busy || got === 0}>
-          Finish & review ({got} fields)
+        <button className="btn" onClick={() => runStep({ finish: true })} disabled={busy || answers === 0}>
+          Finish & review ({answers} answer{answers === 1 ? "" : "s"})
         </button>
       </footer>
     </div>

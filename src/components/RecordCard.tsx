@@ -3,7 +3,7 @@ import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { UserContext } from "../context";
 import {
-  BOARD_STAGES, STAGE_BY_ID, TEMPLATE_BY_ID, TEMPLATES, MEDDIC_LETTERS, nextStageId,
+  boardStages, STAGE_BY_ID, TEMPLATE_BY_ID, TEMPLATES, MEDDIC_LETTERS, nextStageId,
 } from "../../convex/pipeline";
 import {
   gateProgress, fmtEur, daysBetween, letterScore, meddicPct,
@@ -40,7 +40,7 @@ export function RecordCard(props: Props) {
   const readyToAdvance =
     !stage.terminal && !stage.parking && next !== null &&
     stage.exitGates.length > 0 && progressHead.done === progressHead.total;
-  const prevStage = BOARD_STAGES.find((s) => s.order === stage.order - 1);
+  const prevStage = boardStages().find((s) => s.order === stage.order - 1);
 
   const moveBack = async () => {
     if (!prevStage) return;
@@ -248,8 +248,9 @@ function GatesTab(props: Props) {
       return n;
     });
 
-  const templateForGate = (gateId: string, stageId: string): string | undefined =>
-    TEMPLATES.find((t) => t.stages.includes(stageId) && t.fields.some((f) => f.satisfiesGate === gateId))?.id;
+  const templatesForStage = (stageId: string) =>
+    TEMPLATES.filter((t) => t.id !== "disposition" && t.stages.includes(stageId))
+      .sort((a, b) => (a.stages[0] === stageId ? 0 : 1) - (b.stages[0] === stageId ? 0 : 1));
 
   return (
     <div className="stair">
@@ -259,7 +260,7 @@ function GatesTab(props: Props) {
           Deal is {state.disposition?.kind ?? "parked"} — the staircase shows where it paused.
         </p>
       )}
-      {BOARD_STAGES.map((stage) => {
+      {boardStages().map((stage) => {
         const status = stage.order < currentOrder ? "past" : stage.order === currentOrder ? "current" : "future";
         const visit = visits.filter((v) => v.stageId === stage.id).slice(-1)[0];
         const done = stage.exitGates.filter((g) => state.gates[g.id]).length;
@@ -283,17 +284,19 @@ function GatesTab(props: Props) {
                 ) : (
                   <ul className="gates">
                     {stage.exitGates.map((g) => (
-                      <GateRow
-                        key={g.id}
-                        gate={g}
-                        entries={ledger[g.id]}
-                        met={Boolean(state.gates[g.id])}
-                        live={live && status === "current"}
-                        resolveTemplate={templateForGate(g.id, stage.id)}
-                        onResolve={onFileUpdate}
-                      />
+                      <GateRow key={g.id} gate={g} entries={ledger[g.id]} met={Boolean(state.gates[g.id])} />
                     ))}
                   </ul>
+                )}
+                {live && status === "current" && templatesForStage(stage.id).length > 0 && (
+                  <div className="stage-file-actions">
+                    <span className="faint" style={{ fontSize: 11.5 }}>File for this stage:</span>
+                    {templatesForStage(stage.id).map((t, i) => (
+                      <button key={t.id} className={"btn tiny" + (i === 0 ? " primary" : "")} onClick={() => onFileUpdate(t.id)}>
+                        {t.name}
+                      </button>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
@@ -305,50 +308,42 @@ function GatesTab(props: Props) {
 }
 
 function GateRow({
-  gate, entries, met, live, resolveTemplate, onResolve,
+  gate, entries, met,
 }: {
-  gate: { id: string; label: string; cp?: string; coach?: string };
+  gate: { id: string; label: string; cp?: string; coach?: string; code?: string };
   entries: GateEntry[] | undefined;
   met: boolean;
-  live: boolean;
-  resolveTemplate?: string;
-  onResolve: (templateId?: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const drift = gateDrift(entries);
   const last = entries?.[entries.length - 1];
+  const filledBy = TEMPLATES.find((t) => t.fields.some((f) => f.satisfiesGate === gate.id));
 
   return (
     <li className={met ? "met" : "unmet"} style={{ flexDirection: "column", alignItems: "stretch", gap: 4 }}>
       <button className="gate-row-btn" onClick={() => setOpen(!open)}>
+        <span className="gate-code mono">{gate.code}</span>
         <span className="gate-check">{met ? "✓" : ""}</span>
         <span className="gate-label">
           {gate.label}
           {gate.cp && <em className="cp-mini">{gate.cp}</em>}
         </span>
         {drift && <span className="pill amber" title={`Was: ${drift.from}`}>↻ changed</span>}
-        {last ? (
-          <span className="gate-ev">{last.at}</span>
-        ) : live && resolveTemplate ? (
-          <span
-            className="btn tiny gate-resolve"
-            role="button"
-            onClick={(e) => { e.stopPropagation(); onResolve(resolveTemplate); }}
-          >
-            Resolve via {TEMPLATE_BY_ID[resolveTemplate].name}
-          </span>
-        ) : (
-          <span className="gate-ev faint">open</span>
-        )}
+        {last ? <span className="gate-ev">{last.at}</span> : <span className="gate-ev faint">open</span>}
         <span className="faint">{open ? "▾" : "▸"}</span>
       </button>
 
       {open && (
         <div className="gate-detail">
           {gate.coach && <p className="gate-coach" style={{ margin: "0 0 8px" }}>💡 {gate.coach}</p>}
+          {filledBy && (
+            <p className="faint" style={{ margin: "0 0 8px", fontSize: 11.5 }}>
+              Filled by the <b>{filledBy.name}</b> template ({filledBy.discipline}).
+            </p>
+          )}
           {!entries || entries.length === 0 ? (
             <p className="muted" style={{ margin: 0, fontSize: 12 }}>
-              Nothing filed for this gate yet{live && resolveTemplate ? ` — file a ${TEMPLATE_BY_ID[resolveTemplate].name}.` : "."}
+              Nothing filed for this gate yet{filledBy ? ` — file a ${filledBy.name} (button below the gate list).` : "."}
             </p>
           ) : (
             <>

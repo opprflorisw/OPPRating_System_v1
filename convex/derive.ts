@@ -178,12 +178,16 @@ export interface LetterDelta {
 
 // ── The provenance chain: gate → field → filings → evidence ────────────────
 
-// Which (template, field) pairs can satisfy each gate.
-const GATE_FIELDS: Record<string, { templateId: string; fieldId: string }[]> = {};
-for (const t of TEMPLATES) {
-  for (const f of t.fields) {
-    if (f.satisfiesGate) (GATE_FIELDS[f.satisfiesGate] ??= []).push({ templateId: t.id, fieldId: f.id });
+// Which (template, field) pairs can satisfy each gate. Computed on demand so
+// it always reflects the active (possibly DB-edited) blueprint.
+function gateFieldMap(): Record<string, { templateId: string; fieldId: string }[]> {
+  const map: Record<string, { templateId: string; fieldId: string }[]> = {};
+  for (const t of TEMPLATES) {
+    for (const f of t.fields) {
+      if (f.satisfiesGate) (map[f.satisfiesGate] ??= []).push({ templateId: t.id, fieldId: f.id });
+    }
   }
+  return map;
 }
 
 export interface GateEntry {
@@ -207,12 +211,13 @@ export function gateLedger(events: DealEvent[], asOf: string): Record<string, Ga
     .slice()
     .sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   const ledger: Record<string, GateEntry[]> = {};
+  const gateFields = gateFieldMap();
 
   for (const e of sorted) {
     const listed = new Set(e.gatesSatisfied ?? []);
     const touched = new Map<string, { value: string; fieldId: string }>();
     if (e.type === "template" && e.payload && e.templateId) {
-      for (const [gateId, pairs] of Object.entries(GATE_FIELDS)) {
+      for (const [gateId, pairs] of Object.entries(gateFields)) {
         for (const p of pairs) {
           if (p.templateId !== e.templateId) continue;
           const v = (e.payload as Record<string, unknown>)[p.fieldId];
