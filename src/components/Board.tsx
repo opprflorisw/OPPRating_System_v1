@@ -40,7 +40,7 @@ export function Board({ rows, live, onSelect, onRequestMove }: Props) {
             </header>
             <div className="col-body">
               {inStage.map((row) => (
-                <Card key={row.deal._id} row={row} live={live} onSelect={onSelect} dragging={dragId === row.deal._id} setDragId={setDragId} />
+                <Card key={row.deal._id} row={row} live={live} onSelect={onSelect} onRequestMove={onRequestMove} dragging={dragId === row.deal._id} setDragId={setDragId} />
               ))}
             </div>
           </section>
@@ -58,7 +58,7 @@ export function Board({ rows, live, onSelect, onRequestMove }: Props) {
             rows
               .filter((r) => r.state.stageId === stage.id)
               .map((row) => (
-                <Card key={row.deal._id} row={row} live={live} onSelect={onSelect} dragging={false} setDragId={() => {}} />
+                <Card key={row.deal._id} row={row} live={live} onSelect={onSelect} onRequestMove={() => {}} dragging={false} setDragId={() => {}} />
               ))
           )}
         </div>
@@ -68,11 +68,12 @@ export function Board({ rows, live, onSelect, onRequestMove }: Props) {
 }
 
 function Card({
-  row, live, onSelect, dragging, setDragId,
+  row, live, onSelect, onRequestMove, dragging, setDragId,
 }: {
   row: DealRow;
   live: boolean;
   onSelect: (id: string) => void;
+  onRequestMove: (row: DealRow) => void;
   dragging: boolean;
   setDragId: (id: string | null) => void;
 }) {
@@ -82,6 +83,7 @@ function Card({
   const pct = progress.total === 0 ? 100 : Math.round((progress.done / progress.total) * 100);
   const unresolvedOverride = state.overrides.some((o) => !o.resolved);
   const movable = live && !stage.terminal && !stage.parking;
+  const ready = movable && stage.exitGates.length > 0 && progress.done === progress.total;
 
   return (
     <article
@@ -115,7 +117,17 @@ function Card({
             {unresolvedOverride && <span className="pill red">⚑ override</span>}
             {state.blocker && <span className="pill amber" title={state.blocker}>blocked</span>}
             <span className={"pill" + (state.daysInStage > 60 ? " red" : "")}>{state.daysInStage}d</span>
-            <span className="pill outline">{state.forecastCategory}</span>
+            {ready ? (
+              <button
+                className="btn advance tiny"
+                style={{ marginLeft: "auto" }}
+                onClick={(e) => { e.stopPropagation(); onRequestMove(row); }}
+              >
+                Advance →
+              </button>
+            ) : (
+              <span className="pill outline">{state.forecastCategory}</span>
+            )}
           </div>
         </>
       )}

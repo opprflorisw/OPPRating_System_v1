@@ -36,6 +36,21 @@ export function RecordCard(props: Props) {
   const next = nextStageId(state.stageId);
   const appendEvent = useMutation(api.deals.appendEvent);
   const user = useContext(UserContext);
+  const progressHead = gateProgress(stage, state);
+  const readyToAdvance =
+    !stage.terminal && !stage.parking && next !== null &&
+    stage.exitGates.length > 0 && progressHead.done === progressHead.total;
+  const prevStage = BOARD_STAGES.find((s) => s.order === stage.order - 1);
+
+  const moveBack = async () => {
+    if (!prevStage) return;
+    await appendEvent({
+      dealId: deal._id as never,
+      at: asOf, author: user.name, discipline: "Sales", type: "stage",
+      from: state.stageId, to: prevStage.id,
+      note: `Moved back to ${prevStage.name} (correction by ${user.name}). Gate evidence is preserved on the record.`,
+    });
+  };
 
   // Where a parked deal would return to: the stage it paused from.
   const pausedFrom = stage.parking
@@ -74,14 +89,24 @@ export function RecordCard(props: Props) {
             )}
             {live && !stage.terminal && !stage.parking && (
               <>
-                <button className="btn primary" onClick={() => onFileUpdate()}>File an update</button>
+                {readyToAdvance && next ? (
+                  <button className="btn advance" onClick={onRequestMove}>
+                    ✓ Advance to {STAGE_BY_ID[next].name} →
+                  </button>
+                ) : (
+                  <button className="btn primary" onClick={() => onFileUpdate()}>File an update</button>
+                )}
                 <div className="menu-wrap">
                   <button className="btn quiet" onClick={() => setMenuOpen(!menuOpen)}>···</button>
                   {menuOpen && (
                     <div className="menu" onMouseLeave={() => setMenuOpen(false)}>
-                      {next && <button onClick={() => { setMenuOpen(false); onRequestMove(); }}>Advance to {STAGE_BY_ID[next].name} →</button>}
+                      {readyToAdvance && <button onClick={() => { setMenuOpen(false); onFileUpdate(); }}>File an update</button>}
+                      {next && !readyToAdvance && <button onClick={() => { setMenuOpen(false); onRequestMove(); }}>Advance to {STAGE_BY_ID[next].name} →</button>}
                       <button onClick={() => { setMenuOpen(false); onFileUpdate("meddic_snapshot"); }}>New MEDDIC snapshot</button>
                       <button onClick={() => { setMenuOpen(false); onOpenClient(); }}>Open MEDDIC history</button>
+                      {prevStage && (
+                        <button onClick={() => { setMenuOpen(false); void moveBack(); }}>← Move back to {prevStage.name}</button>
+                      )}
                       <div className="sep" />
                       <button className="park" onClick={() => { setMenuOpen(false); onDisposition(); }}>⏸ Park (Stagnate)…</button>
                       <button className="lose" onClick={() => { setMenuOpen(false); onDisposition(); }}>✕ Close Lost…</button>
@@ -118,9 +143,30 @@ export function RecordCard(props: Props) {
   );
 }
 
+/* ── Ready-to-advance banner (Overview + Gates) ───────────────────────── */
+
+function ReadyBanner({ row, live, onRequestMove }: Props) {
+  const { state } = row;
+  const stage = STAGE_BY_ID[state.stageId];
+  const next = nextStageId(state.stageId);
+  const progress = gateProgress(stage, state);
+  if (stage.terminal || stage.parking || !next || stage.exitGates.length === 0 || progress.done !== progress.total) return null;
+  return (
+    <div className="ready-banner">
+      <span>✓ All {progress.total} exit gates for <b>{stage.name}</b> are met{stage.checkpoint ? ` (${stage.checkpoint.id} cleared)` : ""}.</span>
+      {live && (
+        <button className="btn advance" onClick={onRequestMove}>
+          Advance to {STAGE_BY_ID[next].name} →
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ── Overview ─────────────────────────────────────────────────────────── */
 
-function OverviewTab({ row, asOf }: Props) {
+function OverviewTab(props: Props) {
+  const { row, asOf } = props;
   const { deal, state } = row;
   const stage = STAGE_BY_ID[state.stageId];
   const progress = gateProgress(stage, state);
@@ -128,6 +174,7 @@ function OverviewTab({ row, asOf }: Props) {
 
   return (
     <div>
+      <ReadyBanner {...props} />
       <div className="drawer-strip">
         <span className="pill blue">{stage.name}</span>
         <span className="pill outline mono">ACV {fmtEur(deal.acv)}</span>
@@ -183,7 +230,8 @@ function OverviewTab({ row, asOf }: Props) {
 
 /* ── Gates — the staircase ────────────────────────────────────────────── */
 
-function GatesTab({ row, asOf, live, onFileUpdate }: Props) {
+function GatesTab(props: Props) {
+  const { row, asOf, live, onFileUpdate } = props;
   const { deal, state } = row;
   const ledger = useMemo(() => gateLedger(deal.events, asOf), [deal.events, asOf]);
   const visits = useMemo(() => stageHistory(deal.events, asOf), [deal.events, asOf]);
@@ -205,6 +253,7 @@ function GatesTab({ row, asOf, live, onFileUpdate }: Props) {
 
   return (
     <div className="stair">
+      <ReadyBanner {...props} />
       {isParked && (
         <p className="muted" style={{ fontSize: 12 }}>
           Deal is {state.disposition?.kind ?? "parked"} — the staircase shows where it paused.

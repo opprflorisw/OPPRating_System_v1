@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAction, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { TEMPLATE_BY_ID, STAGE_BY_ID } from "../../convex/pipeline";
+import { TEMPLATE_BY_ID, STAGE_BY_ID, nextStageId } from "../../convex/pipeline";
+import { gateLedger } from "../../convex/derive";
 import { Md } from "./Markdown";
 import type { DealRow } from "../App";
 
@@ -13,6 +14,7 @@ interface Msg {
 interface Props {
   row: DealRow;
   templateId: string;
+  asOf: string;
   onDone: (collected: Record<string, string>) => void;
   onBack: () => void;
 }
@@ -20,12 +22,34 @@ interface Props {
 // The guided interview: a chat with "the most experienced person for this
 // gate". Typed or spoken answers; fields and gates light up as they are
 // collected; finishing hands the values to the review form.
-export function GuidedChat({ row, templateId, onDone, onBack }: Props) {
+export function GuidedChat({ row, templateId, asOf, onDone, onBack }: Props) {
   const { deal, state } = row;
   const template = TEMPLATE_BY_ID[templateId];
   const stage = STAGE_BY_ID[state.stageId];
   const step = useAction(api.guide.step);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+
+  // Per-field truth BEFORE the interview starts: which gate-fields are already
+  // satisfied (by ANY earlier filing), with the value that satisfied them.
+  // This is what stops the interviewer re-asking green gates.
+  const fieldStatus = useMemo(() => {
+    const ledger = gateLedger(deal.events, asOf);
+    const prior = deal.events
+      .filter((e) => e.type === "template" && e.templateId === templateId && e.payload)
+      .slice(-1)[0]?.payload as Record<string, unknown> | undefined;
+    return template.fields.map((f) => {
+      const gateId = f.satisfiesGate;
+      const gateMet = gateId ? Boolean(state.gates[gateId]) : false;
+      const lastEntry = gateId ? ledger[gateId]?.slice(-1)[0] : undefined;
+      const priorValue = prior?.[f.id];
+      return {
+        field: f,
+        gateMet,
+        currentValue: lastEntry?.value ?? (priorValue !== undefined && priorValue !== "" ? String(priorValue) : undefined),
+        satisfiedAt: gateId ? state.gates[gateId]?.at : undefined,
+      };
+    });
+  }, [deal.events, asOf, templateId, template.fields, state.gates]);
 
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [collected, setCollected] = useState<Record<string, string>>({});
@@ -39,15 +63,39 @@ export function GuidedChat({ row, templateId, onDone, onBack }: Props) {
   const startedRef = useRef(false);
 
   const dealContext = (() => {
-    const unmet = stage.exitGates.filter((g) => !state.gates[g.id]).map((g) => g.label);
-    const prior = deal.events
-      .filter((e) => e.type === "template" && e.templateId === templateId && e.payload)
-      .slice(-1)[0];
     const bits: string[] = [];
-    if (unmet.length) bits.push(`Unmet exit gates for ${stage.name}: ${unmet.join("; ")}.`);
-    if (prior) bits.push(`Previous ${template.name} (${prior.at}): ${JSON.stringify(prior.payload).slice(0, 800)}`);
+    const satisfied = fieldStatus.filter((fs) => fs.gateMet);
+    const missingGateFields = fieldStatus.filter((fs) => fs.field.satisfiesGate && !fs.gateMet);
+    const known = fieldStatus.filter((fs) => !fs.field.satisfiesGate && fs.currentValue);
+    if (satisfied.length) {
+      bits.push(
+        `ALREADY ON FILE — these fields' gates are ALREADY SATISFIED, do NOT ask about them again:\n` +
+          satisfied
+            .map((fs) => `- ${fs.field.label} [gate met ${fs.satisfiedAt ?? ""}]: ${String(fs.currentValue ?? "confirmed").slice(0, 200)}`)
+            .join("\n")
+      );
+    }
+    if (missingGateFields.length) {
+      bits.push(
+        `STILL MISSING — these are the gates this interview must fill:\n` +
+          missingGateFields.map((fs) => `- ${fs.field.label} (gate: ${stage.exitGates.find((g) => g.id === fs.field.satisfiesGate)?.label ?? fs.field.satisfiesGate})`).join("\n")
+      );
+    } else {
+      const next = nextStageId(state.stageId);
+      const allMet = stage.exitGates.every((g) => state.gates[g.id]);
+      if (allMet && next) {
+        bits.push(
+          `ALL EXIT GATES FOR ${stage.name.toUpperCase()} ARE MET. This interview is for updates/refreshes only. ` +
+            `Tell the user up front that the stage is complete and they can advance to ${STAGE_BY_ID[next].name}; only collect what they volunteer as new.`
+        );
+      }
+    }
+    if (known.length) {
+      bits.push(`Known non-gate values (confirm only if relevant):\n` + known.map((fs) => `- ${fs.field.label}: ${String(fs.currentValue).slice(0, 150)}`).join("\n"));
+    }
     if (state.blocker) bits.push(`Current blocker: ${state.blocker}`);
-    return bits.join("\n");
+    bits.push(`Days in stage: ${state.daysInStage}.`);
+    return bits.join("\n\n");
   })();
 
   const scroll = () => setTimeout(() => bodyRef.current?.scrollTo({ top: 99999, behavior: "smooth" }), 60);
@@ -132,18 +180,29 @@ export function GuidedChat({ row, templateId, onDone, onBack }: Props) {
 
   const total = template.fields.length;
   const got = template.fields.filter((f) => collected[f.id] !== undefined).length;
-  const gateFields = template.fields.filter((f) => f.satisfiesGate);
+  const gateChips = fieldStatus.filter((fs) => fs.field.satisfiesGate);
+  const gateLabel = (fs: (typeof fieldStatus)[number]) => {
+    const g = stage.exitGates.find((x) => x.id === fs.field.satisfiesGate);
+    const label = g?.label ?? fs.field.label;
+    return label.length > 38 ? label.slice(0, 37) + "…" : label;
+  };
 
   return (
     <div className="guided">
       <div className="guided-progress">
         <div className="gauge"><div className="gauge-fill" style={{ width: total ? (got / total) * 100 + "%" : "0%" }} /></div>
-        <span className="mono faint" style={{ fontSize: 11 }}>{got}/{total} fields</span>
-        {gateFields.map((f) => (
-          <span key={f.id} className={"pill " + (collected[f.id] !== undefined ? "green" : "outline")} title={f.label}>
-            ⛩ {f.satisfiesGate}
-          </span>
-        ))}
+        <span className="mono faint" style={{ fontSize: 11 }}>{got}/{total} fields this session</span>
+      </div>
+      <div className="guided-gates">
+        {gateChips.map((fs) => {
+          const captured = collected[fs.field.id] !== undefined;
+          const cls = fs.gateMet ? "done-before" : captured ? "captured" : "open";
+          return (
+            <span key={fs.field.id} className={"gate-chip " + cls} title={fs.gateMet ? `Already satisfied ${fs.satisfiedAt ?? ""}: ${fs.currentValue ?? ""}` : fs.field.label}>
+              {fs.gateMet ? "✓" : captured ? "✦" : "○"} {gateLabel(fs)}
+            </span>
+          );
+        })}
       </div>
 
       <div className="guided-body" ref={bodyRef}>

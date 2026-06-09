@@ -216,7 +216,7 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
   return (
     <>
       <div className="scrim modal-scrim" onClick={onClose} />
-      <div className="modal">
+      <div className={"modal" + (step === "guided" && tpl ? " wide" : "")}>
         <h3>File an update · {deal.account}</h3>
 
         {!tpl ? (
@@ -257,7 +257,7 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
             </footer>
           </>
         ) : step === "guided" ? (
-          <GuidedChat row={row} templateId={tpl.id} onDone={onGuidedDone} onBack={() => setStep("mode")} />
+          <GuidedChat row={row} templateId={tpl.id} asOf={asOf} onDone={onGuidedDone} onBack={() => setStep("mode")} />
         ) : step === "evidence" ? (
           <>
             <p className="modal-sub">

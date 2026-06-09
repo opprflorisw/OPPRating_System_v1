@@ -86,6 +86,11 @@ export const step = action({
       `${JSON.stringify(fieldSpec, null, 1)}\n\n` +
       (args.dealContext ? `What we already know about this deal:\n${args.dealContext}\n\n` : "") +
       `Interview rules:\n` +
+      `- HARD RULE: fields listed under "ALREADY ON FILE" have their gates satisfied. NEVER ask about them. ` +
+      `In your FIRST message, acknowledge them in one compact line (e.g. "✓ Already on file: core problem, urgency, ICP fit") ` +
+      `and go straight to what is STILL MISSING. Only touch a satisfied field if the user volunteers new information about it.\n` +
+      `- If the context says ALL exit gates are met, open by saying the stage is complete and the user can advance — ` +
+      `then offer to capture anything new. Do not interview for the sake of it.\n` +
       `- Ask 2-3 RELATED fields at a time (use the field groups). Never dump the whole list.\n` +
       `- COACH as you ask: when a field has successCriteria, weave in what success looks like, briefly. ` +
       `Example: instead of "What are the success criteria?", say "What did you agree success looks like? ` +
@@ -99,8 +104,9 @@ export const step = action({
       `- Extract values continuously: after EVERY user answer, update collected with everything said so far ` +
       `(cumulative, keep earlier values unless corrected). Clean full sentences; dates YYYY-MM-DD; numbers as digits; ` +
       `select fields exactly one of the options; check fields "true"/"false".\n` +
-      `- When everything is covered or skipped (or the user asks to finish), set done=true and wrap up in 2-3 sentences: ` +
-      `what was captured, **what is still missing and why it matters** (use the successCriteria).\n` +
+      `- When everything missing is covered or skipped (or the user asks to finish), set done=true and wrap up in 2-3 sentences: ` +
+      `what was captured, **what is still missing and why it matters** (use the successCriteria), and if all gates are now ` +
+      `covered, say explicitly: "After filing, this stage is ready to advance."\n` +
       `- No em dashes. Be the colleague everyone wishes they had on their first deal.\n\n` +
       `ALWAYS respond with ONLY a JSON object: {"reply": string (markdown), "collected": {fieldId: value, ...}, "done": boolean}.`;
 

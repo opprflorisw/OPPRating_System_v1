@@ -142,6 +142,9 @@ body {
 .btn.danger.solid { background: var(--red); border-color: var(--red); color: #fff; }
 .btn.tiny { padding: 3px 9px; font-size: 12px; }
 .btn.ai { background: var(--violet-soft); border-color: #e2d6fb; color: var(--violet); font-weight: 600; }
+/* The "all gates clear, move it forward" action — unmistakably green */
+.btn.advance { background: var(--green); border-color: var(--green); color: #fff; font-weight: 600; }
+.btn.advance:hover { background: #116436; }
 
 /* ── Pills / tags ─────────────────────────────────────────────────────── */
 .pill {
@@ -555,16 +558,37 @@ li.unmet .gate-label { color: var(--text-2); }
 .cover-list { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
 
 /* ── Guided interview ─────────────────────────────────────────────────── */
-.guided { display: flex; flex-direction: column; min-height: 420px; }
+.modal.wide { width: min(880px, 96vw); }
+.guided { display: flex; flex-direction: column; min-height: 540px; }
 .guided-progress {
   display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
-  padding: 8px 0 10px; border-bottom: 1px solid var(--border);
+  padding: 8px 0 6px;
 }
-.guided-progress .gauge { flex: 0 0 120px; }
+.guided-progress .gauge { flex: 0 0 140px; }
+.guided-gates {
+  display: flex; gap: 5px; flex-wrap: wrap;
+  padding: 0 0 10px; border-bottom: 1px solid var(--border);
+}
+.gate-chip {
+  font-size: 11px; font-weight: 500; border-radius: 99px; padding: 2.5px 10px;
+  white-space: nowrap;
+}
+.gate-chip.done-before { background: var(--green-soft); color: var(--green); opacity: 0.75; }
+.gate-chip.captured { background: var(--violet-soft); color: var(--violet); font-weight: 600; }
+.gate-chip.open { background: var(--surface); border: 1px dashed var(--border-strong); color: var(--text-3); }
 .guided-body {
-  flex: 1; overflow-y: auto; max-height: 360px; min-height: 240px;
-  display: flex; flex-direction: column; gap: 9px; padding: 12px 2px;
+  flex: 1; overflow-y: auto; max-height: 56vh; min-height: 340px;
+  display: flex; flex-direction: column; gap: 10px; padding: 14px 2px;
 }
+.guided-body .msg pre, .guided-body .msg .md { font-size: 13.5px; }
+
+.ready-banner {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: var(--green-soft); border: 1px solid #bfe8cc; border-radius: var(--r);
+  padding: 11px 14px; margin: 12px 0; font-size: 13px; color: var(--green);
+}
+.ready-banner b { color: var(--text); }
+.ready-banner .btn { margin-left: auto; }
 .guided-foot { display: flex; gap: 7px; padding: 10px 0 0; border-top: 1px solid var(--border); }
 .guided-foot input {
   flex: 1; font-family: var(--sans); font-size: 13px;
