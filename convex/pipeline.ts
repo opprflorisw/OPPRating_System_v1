@@ -1,0 +1,360 @@
+// ============================================================================
+// OPPRating System — Pipeline definition
+// Source: Oppr · Commercial Ops · Pipeline Operating Manual (Lars Grønkjær,
+// June 2026, v1.0). Stages, exit gates and checkpoints encoded as data.
+// This file is the single source of truth, shared by the Convex backend and
+// the React frontend. When this moves to HubSpot: stage -> pipeline stage,
+// gate -> conditional stage property, template -> form / Claude skill.
+// ============================================================================
+
+export type GateType = "check" | "text" | "number" | "currency" | "date" | "contact";
+
+export interface Gate {
+  id: string;
+  label: string;
+  type: GateType;
+  cp?: "CP1" | "CP2" | "CP3";
+  hint?: string;
+}
+
+export interface Stage {
+  id: string;
+  name: string;
+  short: string;
+  order: number;
+  probability: number; // win probability, drives weighted forecast
+  forecastCategory: "Pipeline" | "Upside" | "Commit" | "Closed" | "Omitted";
+  purpose: string;
+  checkpoint?: { id: "CP1" | "CP2" | "CP3"; label: string };
+  // Gates that must be satisfied to EXIT this stage (= enter the next one).
+  exitGates: Gate[];
+  terminal?: boolean;
+  parking?: boolean;
+}
+
+export const STAGES: Stage[] = [
+  {
+    id: "lead",
+    name: "Lead",
+    short: "LEAD",
+    order: 0,
+    probability: 5,
+    forecastCategory: "Pipeline",
+    purpose:
+      "New lead from inbound, outbound, events or referrals. A deal does not enter Discovery until prep is done.",
+    exitGates: [
+      { id: "prep_filed", label: "Pre-meeting prep filed (6-point self-check)", type: "check" },
+      { id: "meeting_booked", label: "First meeting booked with date", type: "date" },
+    ],
+  },
+  {
+    id: "discovery",
+    name: "Discovery",
+    short: "DISC",
+    order: 1,
+    probability: 10,
+    forecastCategory: "Pipeline",
+    purpose:
+      "Confirm structural ICP fit, urgency, pain and a Champion candidate. Multi-touch. MEDDIC light capture.",
+    exitGates: [
+      { id: "core_problem", label: "Aligned on core problem", type: "text" },
+      { id: "urgency", label: "Urgency confirmed", type: "text" },
+      { id: "icp_fit", label: "ICP structural fit confirmed (250+ FTE, OE-aware, 3-10 sites)", type: "check" },
+      { id: "champion_candidate", label: "Champion candidate identified (HQ influence potential)", type: "contact" },
+      { id: "structured_next_step", label: "Agreement to structured next step, multiple stakeholders", type: "check" },
+      { id: "next_meeting", label: "Exact date for next meeting set", type: "date" },
+      { id: "insights_3", label: ">=3 insights per category (Problem / ICP / Decision / Champion / Objections / Interest)", type: "number" },
+    ],
+  },
+  {
+    id: "solution_validation",
+    name: "Solution Validation",
+    short: "SOL-VAL",
+    order: 2,
+    probability: 25,
+    forecastCategory: "Pipeline",
+    purpose:
+      "Pre-POC alignment. Get to the Economic Buyer and qualify the ARR decision before any POC paper is written.",
+    checkpoint: { id: "CP1", label: "Pre-POC MEDDIC review — mandatory, no exceptions" },
+    exitGates: [
+      { id: "use_cases", label: "Main use cases agreed (~3) tied to operational pain", type: "text", cp: "CP1" },
+      { id: "success_criteria", label: "Success criteria co-signed by Champion AND EB", type: "check", cp: "CP1" },
+      { id: "poc_scope", label: "POC scope defined, 10-week target timeline", type: "check", cp: "CP1" },
+      { id: "champion_confirmed", label: "Champion confirmed (access, advocates, HQ influence)", type: "contact", cp: "CP1" },
+      { id: "poc_decision", label: "POC decision process mapped (EUR 25K pilot budget owner)", type: "text", cp: "CP1" },
+      { id: "arr_decision", label: "ARR decision process mapped (IC local/global or DM + sign-off)", type: "text", cp: "CP1" },
+      { id: "decision_driver", label: "Decision driver confirmed: Hours, % or EUR saved", type: "text", cp: "CP1" },
+      { id: "arr_pricing", label: "ARR pricing range socialised, blockers identified", type: "check", cp: "CP1" },
+      { id: "meddic_cp1", label: "Full MEDDIC attached + Last Reviewed date (CP1)", type: "date", cp: "CP1" },
+    ],
+  },
+  {
+    id: "poc",
+    name: "POC",
+    short: "POC",
+    order: 3,
+    probability: 50,
+    forecastCategory: "Upside",
+    purpose:
+      "Validate technical fit on customer data (Oppr Lite, 10-week build). Build procurement runway in parallel.",
+    checkpoint: { id: "CP2", label: "Post-POC MEDDIC refresh before Procurement" },
+    exitGates: [
+      { id: "offer_signed", label: "POC offer signed + NDA", type: "check", cp: "CP2" },
+      { id: "po_received", label: "PO received (PDF preferred)", type: "check", cp: "CP2" },
+      { id: "workshop_date", label: "On-site workshop date set", type: "date" },
+      { id: "personas", label: "Personas captured: Plant/Ops, IT/Security, Procurement", type: "check" },
+      { id: "value_validated", label: "Oppr value validated against agreed success criteria", type: "check", cp: "CP2" },
+      { id: "it_security", label: "IT / security path confirmed by email", type: "check" },
+      { id: "roi_metric", label: "ROI calculated against EB's chosen metric (Hours / % / EUR)", type: "currency", cp: "CP2" },
+      { id: "procurement_engaged", label: "Procurement engaged, vendor onboarding started", type: "check" },
+      { id: "meddic_cp2", label: "MEDDIC refreshed against POC learnings (CP2)", type: "date", cp: "CP2" },
+    ],
+  },
+  {
+    id: "negotiation",
+    name: "Procurement & Negotiation",
+    short: "NEGO",
+    order: 4,
+    probability: 75,
+    forecastCategory: "Commit",
+    purpose:
+      "Negotiate the yearly contract. Commit forecast requires CP3: MEDDIC reviewed within 14 days.",
+    checkpoint: { id: "CP3", label: "Pre-Commit: MEDDIC Last Reviewed <= 14 days" },
+    exitGates: [
+      { id: "controlling", label: "Controlling approved", type: "check" },
+      { id: "ic_criteria", label: "IC criteria addressed in the deck", type: "check" },
+      { id: "final_pricing", label: "Final pricing agreed (at/above floor or finance sign-off)", type: "currency" },
+      { id: "legal_docs", label: "Legal docs closed: DPA, NDA, SLA, Master Contract", type: "check" },
+      { id: "signature_path", label: "Signature path confirmed (who signs, when, order)", type: "check" },
+      { id: "close_plan", label: "Mutual close-plan date agreed by Champion + EB", type: "date", cp: "CP3" },
+    ],
+  },
+  {
+    id: "closed_won",
+    name: "Closed Won",
+    short: "WON",
+    order: 5,
+    probability: 100,
+    forecastCategory: "Closed",
+    purpose:
+      "Signed yearly ARR contract. POC and implementation fees are not wins. Triggers post-sale handoff.",
+    exitGates: [],
+    terminal: true,
+  },
+  {
+    id: "stagnated",
+    name: "Stagnated",
+    short: "STAG",
+    order: 6,
+    probability: 0,
+    forecastCategory: "Omitted",
+    purpose:
+      "Paused with an active blocker (frozen budget, leadership change, timing). On the watch-list, reviewed monthly.",
+    exitGates: [],
+    parking: true,
+  },
+  {
+    id: "closed_lost",
+    name: "Closed Lost",
+    short: "LOST",
+    order: 7,
+    probability: 0,
+    forecastCategory: "Omitted",
+    purpose: "Off the books. Mandatory lost reason.",
+    exitGates: [],
+    terminal: true,
+    parking: true,
+  },
+];
+
+export const STAGE_BY_ID: Record<string, Stage> = Object.fromEntries(
+  STAGES.map((s) => [s.id, s])
+);
+
+export const BOARD_STAGES = STAGES.filter((s) => !s.parking);
+
+export function nextStageId(stageId: string): string | null {
+  const s = STAGE_BY_ID[stageId];
+  if (!s || s.terminal || s.parking) return null;
+  const next = STAGES.find((x) => x.order === s.order + 1 && !x.parking);
+  return next ? next.id : null;
+}
+
+// ============================================================================
+// Templates — the standard records each discipline files.
+// Filing a template appends an event to the deal record and can satisfy gates
+// (gatesSatisfied). The person carries the conversation; the template carries
+// the standard.
+// ============================================================================
+
+export type Discipline = "Sales" | "Marketing" | "RevOps" | "I&S";
+
+export interface TemplateField {
+  id: string;
+  label: string;
+  kind: "text" | "longtext" | "number" | "currency" | "date" | "select" | "check";
+  options?: string[];
+  satisfiesGate?: string; // gate id this field can satisfy when filled
+}
+
+export interface Template {
+  id: string;
+  name: string;
+  discipline: Discipline;
+  stages: string[]; // stages where this template is the expected filing
+  description: string;
+  fields: TemplateField[];
+}
+
+export const TEMPLATES: Template[] = [
+  {
+    id: "prep",
+    name: "Pre-meeting prep",
+    discipline: "Sales",
+    stages: ["lead"],
+    description: "The 6-point self-check before the first meeting. Manager spot-checks before the deal converts to Discovery.",
+    fields: [
+      { id: "produce", label: "I understand what they produce", kind: "check" },
+      { id: "complexity", label: "Production complexity assessed", kind: "check" },
+      { id: "attendees", label: "Role & background of every attendee known", kind: "check" },
+      { id: "news", label: "Recent company news reviewed", kind: "check" },
+      { id: "agenda", label: "Agenda sent in advance with hypotheses", kind: "check" },
+      { id: "success_def", label: "Meeting success defined, in writing", kind: "longtext", satisfiesGate: "prep_filed" },
+      { id: "meeting_date", label: "First meeting date", kind: "date", satisfiesGate: "meeting_booked" },
+    ],
+  },
+  {
+    id: "discovery_debrief",
+    name: "Discovery debrief",
+    discipline: "Sales",
+    stages: ["discovery"],
+    description: "Filed after every Discovery touch. The insights log feeds the >=3-per-category gate.",
+    fields: [
+      { id: "attendees", label: "Who was in the room", kind: "text" },
+      { id: "core_problem", label: "Core problem (their words)", kind: "longtext", satisfiesGate: "core_problem" },
+      { id: "urgency", label: "Why now — urgency", kind: "longtext", satisfiesGate: "urgency" },
+      { id: "icp_fit", label: "ICP structural fit confirmed", kind: "check", satisfiesGate: "icp_fit" },
+      { id: "champion", label: "Champion candidate (name, role)", kind: "text", satisfiesGate: "champion_candidate" },
+      { id: "insights", label: "Insights captured (per category)", kind: "longtext", satisfiesGate: "insights_3" },
+      { id: "next_step", label: "Agreed structured next step", kind: "text", satisfiesGate: "structured_next_step" },
+      { id: "next_meeting", label: "Next meeting date", kind: "date", satisfiesGate: "next_meeting" },
+    ],
+  },
+  {
+    id: "meddic_snapshot",
+    name: "MEDDIC snapshot",
+    discipline: "Sales",
+    stages: ["solution_validation", "poc", "negotiation"],
+    description: "One per open deal, the common language across sellers. Refreshing it stamps MEDDIC Last Reviewed (CP1/CP2/CP3).",
+    fields: [
+      { id: "metrics", label: "M — Metrics / EUR case", kind: "longtext" },
+      { id: "eb", label: "E — Economic Buyer (name, role, engaged?)", kind: "text" },
+      { id: "criteria", label: "D — Decision criteria", kind: "longtext" },
+      { id: "process", label: "D — Decision process (IC local/global, DM)", kind: "longtext", satisfiesGate: "arr_decision" },
+      { id: "pain", label: "I — Identified pain", kind: "longtext" },
+      { id: "champion", label: "C — Champion (strength)", kind: "text", satisfiesGate: "champion_confirmed" },
+      { id: "acv", label: "ACV (EUR)", kind: "currency" },
+      { id: "close_target", label: "Close target", kind: "date" },
+      { id: "next_step", label: "Next step", kind: "text" },
+      { id: "blocker", label: "Blocker", kind: "text" },
+    ],
+  },
+  {
+    id: "solval_update",
+    name: "Solution Validation update",
+    discipline: "Sales",
+    stages: ["solution_validation"],
+    description: "Pre-POC alignment progress: use cases, success criteria, scope, decision mapping, pricing.",
+    fields: [
+      { id: "use_cases", label: "Use cases agreed (~3)", kind: "longtext", satisfiesGate: "use_cases" },
+      { id: "success_criteria", label: "Success criteria co-signed (Champion + EB)", kind: "check", satisfiesGate: "success_criteria" },
+      { id: "poc_scope", label: "POC scope + 10-week timeline agreed", kind: "check", satisfiesGate: "poc_scope" },
+      { id: "poc_decision", label: "POC budget owner (EUR 25K)", kind: "text", satisfiesGate: "poc_decision" },
+      { id: "decision_driver", label: "Decision driver (Hours / % / EUR)", kind: "select", options: ["Hours", "%", "EUR"], satisfiesGate: "decision_driver" },
+      { id: "arr_pricing", label: "ARR pricing range socialised", kind: "check", satisfiesGate: "arr_pricing" },
+      { id: "notes", label: "Notes", kind: "longtext" },
+    ],
+  },
+  {
+    id: "poc_update",
+    name: "POC weekly update",
+    discipline: "I&S",
+    stages: ["poc"],
+    description: "Filed weekly by the Forward Engineer during the 10-week Oppr Lite build.",
+    fields: [
+      { id: "week", label: "POC week #", kind: "number" },
+      { id: "substatus", label: "Sub-status", kind: "select", options: ["Offer Sent", "Offer Signed", "POC Active", "POC Validated"] },
+      { id: "adoption", label: "Adoption (% operators logging)", kind: "number" },
+      { id: "milestones", label: "Milestones hit / missed", kind: "longtext" },
+      { id: "value_signal", label: "EUR value signal observed", kind: "currency" },
+      { id: "blocker", label: "Blocker", kind: "text" },
+      { id: "next", label: "Next week", kind: "text" },
+    ],
+  },
+  {
+    id: "nego_update",
+    name: "Negotiation update",
+    discipline: "Sales",
+    stages: ["negotiation"],
+    description: "Procurement runway: controlling, legal, pricing, signature path, close plan.",
+    fields: [
+      { id: "controlling", label: "Controlling approved", kind: "check", satisfiesGate: "controlling" },
+      { id: "legal", label: "Legal docs status (DPA/NDA/SLA/Master)", kind: "text" },
+      { id: "pricing", label: "Final pricing (EUR ARR)", kind: "currency", satisfiesGate: "final_pricing" },
+      { id: "signature", label: "Signature path confirmed", kind: "check", satisfiesGate: "signature_path" },
+      { id: "close_plan", label: "Mutual close-plan date", kind: "date", satisfiesGate: "close_plan" },
+      { id: "notes", label: "Notes", kind: "longtext" },
+    ],
+  },
+  {
+    id: "campaign_touch",
+    name: "Campaign / account touch",
+    discipline: "Marketing",
+    stages: ["lead", "discovery"],
+    description: "ABM play against a named account: channel, engagement, what sourced the lead.",
+    fields: [
+      { id: "channel", label: "Channel", kind: "select", options: ["LinkedIn outbound", "Event", "Content", "Referral", "Website"] },
+      { id: "play", label: "Play / hook used", kind: "longtext" },
+      { id: "engagement", label: "Engagement", kind: "select", options: ["Cold", "Engaged", "Meeting agreed"] },
+      { id: "next_play", label: "Next play", kind: "text" },
+    ],
+  },
+  {
+    id: "disposition",
+    name: "Disposition (Stagnate / Lose)",
+    discipline: "Sales",
+    stages: ["lead", "discovery", "solution_validation", "poc", "negotiation"],
+    description: "Park or kill a deal. Stagnated keeps a reactivation date and stays on the monthly watch-list.",
+    fields: [
+      { id: "kind", label: "Disposition", kind: "select", options: ["Stagnated", "Closed Lost"] },
+      { id: "reason", label: "Reason", kind: "select", options: ["Frozen budget", "Vendor processing", "EB / leadership change", "Doing it themselves", "No EB access", "No urgency", "Lost to competitor", "Pricing", "Internal blocker (ERP/MES)", "Other"] },
+      { id: "detail", label: "Detail", kind: "longtext" },
+      { id: "reactivation", label: "Reactivation date (if Stagnated)", kind: "date" },
+    ],
+  },
+];
+
+export const TEMPLATE_BY_ID: Record<string, Template> = Object.fromEntries(
+  TEMPLATES.map((t) => [t.id, t])
+);
+
+// ============================================================================
+// Event model — the record card is an append-only event log.
+// ============================================================================
+
+export interface DealEvent {
+  at: string; // ISO date "2026-03-14"
+  author: string;
+  discipline: Discipline;
+  type: "template" | "stage" | "gate" | "note" | "flag";
+  templateId?: string;
+  payload?: Record<string, unknown>;
+  note?: string;
+  gatesSatisfied?: string[];
+  from?: string; // stage moves
+  to?: string;
+  override?: boolean; // moved past unmet gates — leaves a visible flag
+}
+
+export const SIM_START = "2026-01-05";
+export const SIM_TODAY = "2026-06-09";
