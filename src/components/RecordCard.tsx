@@ -1,7 +1,9 @@
 import { useContext, useMemo, useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { UserContext } from "../context";
+import { NavContext } from "./Markdown";
+import { NODE_COLOR, NODE_TYPES } from "../../convex/knowledgeModel";
 import {
   boardStages, STAGE_BY_ID, TEMPLATE_BY_ID, TEMPLATES, MEDDIC_LETTERS, nextStageId,
 } from "../../convex/pipeline";
@@ -24,7 +26,7 @@ interface Props {
   onOpenClient: () => void;
 }
 
-type Tab = "overview" | "gates" | "activity" | "meddic";
+type Tab = "overview" | "gates" | "activity" | "meddic" | "knowledge";
 
 export function RecordCard(props: Props) {
   const { row, live, asOf, onClose, onFileUpdate, onRequestMove, onDisposition, onOpenClient } = props;
@@ -126,6 +128,7 @@ export function RecordCard(props: Props) {
               ["gates", "Gates"],
               ["activity", `Activity · ${state.eventCount}`],
               ["meddic", "MEDDIC"],
+              ["knowledge", "Knowledge"],
             ] as [Tab, string][]
           ).map(([id, label]) => (
             <button key={id} className={"drawer-tab" + (tab === id ? " active" : "")} onClick={() => setTab(id)}>
@@ -138,8 +141,71 @@ export function RecordCard(props: Props) {
         {tab === "gates" && <GatesTab {...props} />}
         {tab === "activity" && <ActivityTab {...props} />}
         {tab === "meddic" && <MeddicTab {...props} />}
+        {tab === "knowledge" && <KnowledgeTab {...props} />}
       </aside>
     </>
+  );
+}
+
+/* ── Knowledge tab — this client's graph slice + applicable lessons ────── */
+
+interface KTabNode {
+  _id: string; type: string; title: string; claim: string; confidence: number; status: string;
+}
+
+function KnowledgeTab({ row }: Props) {
+  const { deal } = row;
+  const nav = useContext(NavContext);
+  const data = useQuery(
+    api.knowledge.forClient,
+    deal.clientId ? { clientId: deal.clientId as never } : "skip"
+  ) as { nodes: KTabNode[]; lessons: KTabNode[] } | undefined | null;
+
+  if (!deal.clientId) {
+    return <div className="tab-body"><p className="muted">This deal isn't linked to a client yet. Open the Knowledge page and run <b>Initialize</b> (or reset the simulation).</p></div>;
+  }
+  if (data === undefined) return <div className="tab-body"><p className="muted">Loading the client knowledge graph…</p></div>;
+
+  const nodes = (data?.nodes ?? []).filter((n) => n.status === "active");
+  const lessons = data?.lessons ?? [];
+
+  return (
+    <div className="tab-body k-tab-body">
+      <div className="k-tab-row">
+        <span className="muted" style={{ fontSize: 12 }}>
+          What we've learned about <b>{deal.account}</b> — built automatically from filings.
+        </span>
+        {nodes[0] && (
+          <button className="btn quiet tiny" onClick={() => nav.openKnowledge(nodes[0]._id)}>View in graph →</button>
+        )}
+      </div>
+
+      {nodes.length === 0 ? (
+        <p className="muted" style={{ fontSize: 12 }}>Nothing yet. File a discovery debrief or MEDDIC snapshot — the knowledge graph fills in shortly after.</p>
+      ) : (
+        NODE_TYPES.filter((t) => nodes.some((n) => n.type === t.type)).map((t) => (
+          <div key={t.type} className="k-tab-group">
+            <div className="k-tab-grouphead"><span className="k-dot" style={{ background: t.color }} /> {t.label}</div>
+            {nodes.filter((n) => n.type === t.type).map((n) => (
+              <button key={n._id} className="k-tab-item" onClick={() => nav.openKnowledge(n._id)} title="Open in the knowledge graph">
+                {n.claim}
+              </button>
+            ))}
+          </div>
+        ))
+      )}
+
+      {lessons.length > 0 && (
+        <div className="k-tab-lessons">
+          <div className="k-tab-grouphead">Vertical lessons that apply</div>
+          {lessons.map((n) => (
+            <button key={n._id} className="k-tab-item lesson" onClick={() => nav.openKnowledge(n._id)}>
+              <span className="k-dot" style={{ background: NODE_COLOR[n.type] ?? "#888" }} /> {n.claim}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -1,10 +1,19 @@
 # Knowledge System — Build To-Do
 
-> **Status: FINALIZED 2026-06-10 — planning complete, ready to execute.**
+> **Status: IMPLEMENTED 2026-06-10 — Phases 1–5 built, typechecked and deployed.**
 > Design rationale and every decision (with rejected alternatives) live in
-> [`knowledge-system-design.md`](./knowledge-system-design.md). This file is the
-> execution plan: 20 tasks across 5 phases + an optional backlog. Nothing is built
-> yet — Phase 1.1 is the first commit of real code.
+> [`knowledge-system-design.md`](./knowledge-system-design.md).
+>
+> Built: schema (`clients`, `verticals`, `knowledge`, `knowledgeEdges`,
+> `extractionRuns`) · client backfill + general-tier seeder + sim demo graph
+> (`migrations.ts`, `verticals.ts`, `knowledgeSeed.ts`) · CRUD + `assemble`
+> retrieval (`knowledge.ts`) · background extraction on filing
+> (`knowledgeExtract.ts`, scheduled from `deals.appendEvent`) · interview
+> transcript capture · knowledge wired into `chat.ask/standup/weeklyReview` and
+> `guide.step` with `knowledge:` citation links · promotion engine + weekly cron
+> (`knowledgePromote.ts`, `crons.ts`) · the **Knowledge** page (force-graph,
+> tier lens, node inspector, review queue — `Knowledge.tsx`), RecordCard
+> Knowledge tab, client-aware ChatDock. Phase 6 (optional backlog) remains.
 
 Companion to `knowledge-system-design.md`. Phases are ordered by dependency; tasks
 within a phase are roughly independent. Each task lists the files it touches and a

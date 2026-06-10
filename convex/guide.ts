@@ -33,6 +33,9 @@ export const step = action({
     dealContext: v.optional(v.string()),
     collected: v.optional(v.any()),
     finish: v.optional(v.boolean()),
+    clientId: v.optional(v.id("clients")),
+    workspace: v.optional(v.string()),
+    asOf: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<GuideTurn> => {
     const bp = await ctx.runQuery(api.blueprint.get, {});
@@ -44,6 +47,18 @@ export const step = action({
       reply: msg, collected: prevCollected, done: false, error: true,
     });
     if (!template) return soft("Unknown template — close this dialog and try again.");
+
+    // The team's accumulated knowledge for this client + vertical + methodology.
+    let knowledge = "";
+    try {
+      knowledge = (await ctx.runQuery(api.knowledge.assemble, {
+        workspace: args.workspace ?? "sim",
+        clientId: args.clientId,
+        asOf: args.asOf,
+      })) as string;
+    } catch {
+      knowledge = "";
+    }
 
     // 1. Voice answers: transcribe first, in a dedicated robust call.
     let transcript: string | undefined;
@@ -88,6 +103,9 @@ export const step = action({
       `\n\nFields to collect (successCriteria = what a GOOD answer looks like for that gate — use it):\n` +
       `${JSON.stringify(fieldSpec, null, 1)}\n\n` +
       (args.dealContext ? `What we already know about this deal:\n${args.dealContext}\n\n` : "") +
+      (knowledge
+        ? `What the team already KNOWS (apply it — never re-ask a fact that is already here; use the vertical lessons and plays where they fit, and proactively reference relevant client knowledge):\n${knowledge}\n\n`
+        : "") +
       `Interview rules:\n` +
       `- HARD RULE: fields listed under "ALREADY ON FILE" have their gates satisfied. NEVER ask about them. ` +
       `In your FIRST message, acknowledge them in one compact line (e.g. "✓ Already on file: core problem, urgency, ICP fit") ` +

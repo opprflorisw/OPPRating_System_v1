@@ -8,6 +8,7 @@ export interface StoredEvent extends DealEvent {
 export interface Deal {
   _id: string;
   workspace?: string;
+  clientId?: string;
   slug: string;
   account: string;
   site: string;

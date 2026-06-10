@@ -15,7 +15,7 @@ interface Props {
   row: DealRow;
   templateId: string;
   asOf: string;
-  onDone: (collected: Record<string, string>) => void;
+  onDone: (collected: Record<string, string>, transcript?: string) => void;
   onBack: () => void;
 }
 
@@ -115,6 +115,9 @@ export function GuidedChat({ row, templateId, asOf, onDone, onBack }: Props) {
         dealContext,
         collected,
         finish: opts.finish,
+        clientId: deal.clientId as never,
+        workspace: deal.workspace ?? "sim",
+        asOf,
       });
       const newMsgs: Msg[] = [...msgs];
       if (opts.userText) newMsgs.push({ role: "user", text: opts.userText });
@@ -125,7 +128,12 @@ export function GuidedChat({ row, templateId, asOf, onDone, onBack }: Props) {
       const merged = { ...collected, ...turn.collected };
       setCollected(merged);
       scroll();
-      if (turn.done) onDone(merged);
+      if (turn.done) {
+        const transcript = newMsgs
+          .map((m) => (m.role === "user" ? "User: " : "Coach: ") + m.text)
+          .join("\n\n");
+        onDone(merged, transcript);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

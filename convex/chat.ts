@@ -43,7 +43,16 @@ Formatting rules:
 - Be direct and numerate. Euros, days, counts, score deltas. No filler, no em dashes.
 - Surface gaps like a good sales leader: unmet gates, stale or flat MEDDIC scores,
   unengaged Economic Buyers, rotting deals (>60 days in stage), open override flags.
-- Never invent data that is not in the JSON. If something is unknown, say so.`;
+- Never invent data that is not in the JSON. If something is unknown, say so.
+
+You may also receive a KNOWLEDGE GRAPH block — the team's accumulated knowledge in
+three tiers: general methodology, the industry vertical, and (when you are looking at
+one client) that client. It is the interpretation layer built on top of the deal facts;
+the JSON above stays the factual backbone. When a knowledge claim informs your answer,
+cite it inline as [short label](knowledge:NODE_ID) using its bracketed id — exactly like
+deal links. Prefer recent, high-confidence knowledge and call out anything flagged stale
+or low-confidence. Apply the vertical lessons and plays where they fit the deal in front
+of you.`;
 
 interface DealWithEvents {
   _id: string;
@@ -116,6 +125,24 @@ function buildContext(deals: DealWithEvents[], asOf: string): string {
   return JSON.stringify({ asOf, deals: rows }, null, 1);
 }
 
+// Pull the relevant knowledge tiers for this context (general always; vertical
+// for the workspace; client when a clientId is in play).
+async function knowledgeBlock(
+  ctx: { runQuery: (q: never, a: never) => Promise<unknown> },
+  args: { workspace?: string; clientId?: string; asOf: string }
+): Promise<string> {
+  try {
+    const block = (await ctx.runQuery(api.knowledge.assemble as never, {
+      workspace: args.workspace ?? "sim",
+      clientId: args.clientId as never,
+      asOf: args.asOf,
+    } as never)) as string;
+    return block ? `\n\n${block}` : "";
+  } catch {
+    return "";
+  }
+}
+
 async function run(system: string, user: string, maxTokens = 4096): Promise<string> {
   const result = await geminiGenerate({
     systemInstruction: { parts: [{ text: system }] },
@@ -132,14 +159,20 @@ function simNote(workspace?: string): string {
 }
 
 export const ask = action({
-  args: { question: v.string(), asOf: v.string(), workspace: v.optional(v.string()) },
-  handler: async (ctx, { question, asOf, workspace }): Promise<string> => {
+  args: {
+    question: v.string(),
+    asOf: v.string(),
+    workspace: v.optional(v.string()),
+    clientId: v.optional(v.id("clients")),
+  },
+  handler: async (ctx, { question, asOf, workspace, clientId }): Promise<string> => {
     await loadBlueprint(ctx as never);
     const deals = (await ctx.runQuery(api.deals.list, { workspace })) as unknown as DealWithEvents[];
     const context = buildContext(deals, asOf);
+    const knowledge = await knowledgeBlock(ctx as never, { workspace, clientId, asOf });
     return await run(
       SYSTEM,
-      `Pipeline state as of ${asOf}:\n${context}\n${simNote(workspace)}\n\nQuestion: ${question}`
+      `Pipeline state as of ${asOf}:\n${context}\n${simNote(workspace)}${knowledge}\n\nQuestion: ${question}`
     );
   },
 });
@@ -153,9 +186,10 @@ export const standup = action({
     const lastWeek = new Date(new Date(asOf).getTime() - 7 * 86400000).toISOString().slice(0, 10);
     const now = buildContext(deals, asOf);
     const prev = buildContext(deals, lastWeek);
+    const knowledge = await knowledgeBlock(ctx as never, { workspace, asOf });
     return await run(
       SYSTEM,
-      `State LAST MONDAY (${lastWeek}):\n${prev}\n\nState TODAY (${asOf}):\n${now}\n${simNote(workspace)}\n\n` +
+      `State LAST MONDAY (${lastWeek}):\n${prev}\n\nState TODAY (${asOf}):\n${now}\n${simNote(workspace)}${knowledge}\n\n` +
         `Write the Monday morning stand-up brief for the sales leader, week starting ${asOf}. ` +
         `Work strictly from the CHANGES between the two states. Structure (markdown, with deal links everywhere):\n` +
         `### How the week really went\nOne honest paragraph — no cheerleading. Name the single most important development and the single biggest worry.\n` +
@@ -174,9 +208,10 @@ export const weeklyReview = action({
     await loadBlueprint(ctx as never);
     const deals = (await ctx.runQuery(api.deals.list, { workspace })) as unknown as DealWithEvents[];
     const context = buildContext(deals, asOf);
+    const knowledge = await knowledgeBlock(ctx as never, { workspace, asOf });
     return await run(
       SYSTEM,
-      `Pipeline state as of ${asOf} (${deals.length} deals):\n${context}\n${simNote(workspace)}\n\n` +
+      `Pipeline state as of ${asOf} (${deals.length} deals):\n${context}\n${simNote(workspace)}${knowledge}\n\n` +
         `Generate the Oppr Weekly Commercial Review for the week ending ${asOf} (markdown):\n` +
         `**Headline KPIs:** total open pipeline EUR, weighted forecast EUR, Commit EUR, closed-won ARR, deal count per stage.\n` +
         `Then a table, one row per discipline (Marketing, Sales, Implementation & Support, RevOps): Status (R/A/G) | key number | what moved | stuck / action.\n` +

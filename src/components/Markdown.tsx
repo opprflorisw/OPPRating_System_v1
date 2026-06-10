@@ -8,16 +8,18 @@ export interface RecordNav {
   openDeal: (slug: string) => void;
   openMeddic: (slug: string) => void;
   openLibrary: () => void;
+  openKnowledge: (nodeId: string) => void;
 }
 
 export const NavContext = createContext<RecordNav>({
   openDeal: () => {},
   openMeddic: () => {},
   openLibrary: () => {},
+  openKnowledge: () => {},
 });
 
 // Allow our custom record-link schemes through DOMPurify.
-const URI_RE = /^(?:(?:https?|mailto|deal|meddic|library):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i;
+const URI_RE = /^(?:(?:https?|mailto|deal|meddic|library|knowledge):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i;
 
 marked.setOptions({ breaks: true, gfm: true });
 
@@ -45,6 +47,9 @@ export function Md({ text, className }: { text: string; className?: string }) {
         } else if (href.startsWith("library:")) {
           e.preventDefault();
           nav.openLibrary();
+        } else if (href.startsWith("knowledge:")) {
+          e.preventDefault();
+          nav.openKnowledge(href.slice(10));
         } else if (href.startsWith("http")) {
           a.setAttribute("target", "_blank");
           a.setAttribute("rel", "noreferrer");

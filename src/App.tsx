@@ -18,6 +18,7 @@ import { Clients } from "./components/Clients";
 import { Standup } from "./components/Standup";
 import { Library } from "./components/Library";
 import { Process } from "./components/Process";
+import { Knowledge } from "./components/Knowledge";
 import { ChatDock } from "./components/ChatDock";
 
 export interface DealRow {
@@ -25,7 +26,7 @@ export interface DealRow {
   state: DealState;
 }
 
-type Page = "pipeline" | "clients" | "standup" | "process" | "library";
+type Page = "pipeline" | "clients" | "standup" | "process" | "library" | "knowledge";
 
 const PAGE_TITLES: Record<Page, string> = {
   pipeline: "Pipeline",
@@ -33,6 +34,7 @@ const PAGE_TITLES: Record<Page, string> = {
   standup: "Monday Stand-up",
   process: "Process",
   library: "Library",
+  knowledge: "Knowledge",
 };
 
 export default function App() {
@@ -58,6 +60,7 @@ export default function App() {
   const today = isSim ? SIM_TODAY : realToday;
 
   const [page, setPage] = useState<Page>("pipeline");
+  const [focusNode, setFocusNode] = useState<string | null>(null);
   const [clientSlug, setClientSlug] = useState<string | null>(null);
   const [asOf, setAsOf] = useState<string>(today);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -133,6 +136,10 @@ export default function App() {
       setSelectedId(null);
     },
     openLibrary: () => setPage("library"),
+    openKnowledge: (nodeId: string) => {
+      setFocusNode(nodeId);
+      setPage("knowledge");
+    },
   };
 
   return (
@@ -159,6 +166,7 @@ export default function App() {
           <NavItem icon={<IconPeople />} label="Clients" active={page === "clients"} onClick={() => setPage("clients")} />
           <NavItem icon={<IconPulse />} label="Monday Stand-up" active={page === "standup"} onClick={() => setPage("standup")} />
           <NavItem icon={<IconFlow />} label="Process" active={page === "process"} onClick={() => setPage("process")} />
+          <NavItem icon={<IconGraph />} label="Knowledge" active={page === "knowledge"} onClick={() => { setFocusNode(null); setPage("knowledge"); }} />
           <NavItem icon={<IconBook />} label="Library" active={page === "library"} onClick={() => setPage("library")} />
         </nav>
 
@@ -217,6 +225,8 @@ export default function App() {
         <div className="content">
           {deals === undefined ? (
             <div className="empty">Connecting to Convex…</div>
+          ) : page === "knowledge" ? (
+            <Knowledge workspace={workspace} asOf={today} focusNodeId={focusNode} onClearFocus={() => setFocusNode(null)} />
           ) : !seeded ? (
             isSim ? (
               <div className="empty">
@@ -284,7 +294,7 @@ export default function App() {
         />
       )}
 
-      <ChatDock asOf={asOf} workspace={workspace} />
+      <ChatDock asOf={asOf} workspace={workspace} clientId={selected?.deal.clientId} clientName={selected?.deal.account} />
     </div>
     </NavContext.Provider>
     </UserContext.Provider>
@@ -342,6 +352,16 @@ function IconBook() {
     <svg viewBox="0 0 16 16" {...sw}>
       <path d="M2 2.5h4.5c.8 0 1.5.7 1.5 1.5v9.5c0-.8-.7-1.5-1.5-1.5H2z" />
       <path d="M14 2.5H9.5C8.7 2.5 8 3.2 8 4v9.5c0-.8.7-1.5 1.5-1.5H14z" />
+    </svg>
+  );
+}
+function IconGraph() {
+  return (
+    <svg viewBox="0 0 16 16" {...sw}>
+      <circle cx="3.5" cy="4" r="1.7" />
+      <circle cx="12.5" cy="3.5" r="1.7" />
+      <circle cx="8" cy="12" r="1.7" />
+      <path d="M4.9 5.1 6.9 10.6M11.2 4.8 9.1 10.7M5 4.2l6-.5" />
     </svg>
   );
 }

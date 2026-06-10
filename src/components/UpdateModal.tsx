@@ -46,6 +46,7 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
   const [author, setAuthor] = useState(user.name);
   const [fields, setFields] = useState<Record<string, FieldState>>({});
   const [evidenceText, setEvidenceText] = useState("");
+  const [transcript, setTranscript] = useState<string | undefined>(undefined);
   const [files, setFiles] = useState<File[]>([]);
   const [recording, setRecording] = useState(false);
   const [uploaded, setUploaded] = useState<{ id: string; name: string; mime: string }[]>([]);
@@ -159,8 +160,9 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
   };
 
   // ── Guided interview result ───────────────────────────────────────────
-  const onGuidedDone = (collected: Record<string, string>) => {
+  const onGuidedDone = (collected: Record<string, string>, t?: string) => {
     if (!tpl) return;
+    if (t) setTranscript(t);
     const next: Record<string, FieldState> = { ...fields };
     for (const f of tpl.fields) {
       const v = collected[f.id];
@@ -204,6 +206,7 @@ export function UpdateModal({ row, asOf, preselect, onClose }: Props) {
         gatesSatisfied: gates.length ? gates : undefined,
         provenance,
         evidenceText: evidenceText.trim() || undefined,
+        interviewTranscript: transcript,
         attachments: uploaded.length
           ? uploaded.map((u) => ({ storageId: u.id, name: u.name, mime: u.mime }))
           : undefined,

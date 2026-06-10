@@ -15,7 +15,17 @@ const SUGGESTIONS = [
   "Summarise the Attero Wijster record for a handover.",
 ];
 
-export function ChatDock({ asOf, workspace }: { asOf: string; workspace: string }) {
+export function ChatDock({
+  asOf,
+  workspace,
+  clientId,
+  clientName,
+}: {
+  asOf: string;
+  workspace: string;
+  clientId?: string;
+  clientName?: string;
+}) {
   const ask = useAction(api.chat.ask);
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -29,7 +39,7 @@ export function ChatDock({ asOf, workspace }: { asOf: string; workspace: string 
     setInput("");
     setBusy(true);
     try {
-      const answer = await ask({ question: q, asOf, workspace });
+      const answer = await ask({ question: q, asOf, workspace, clientId: clientId as never });
       setMsgs((m) => [...m, { role: "ai", text: answer }]);
       setTimeout(() => bodyRef.current?.scrollTo({ top: 99999, behavior: "smooth" }), 50);
     } finally {
@@ -46,12 +56,18 @@ export function ChatDock({ asOf, workspace }: { asOf: string; workspace: string 
         <div className="chat">
           <header className="chat-head">
             <b>Ask the data</b>
-            <span className="mono">as of {asOf} · Gemini</span>
+            <span className="mono">
+              {clientId ? `${clientName ?? "client"} context · ` : ""}as of {asOf} · Gemini
+            </span>
           </header>
           <div className="chat-body" ref={bodyRef}>
             {msgs.length === 0 && (
               <div className="chat-sugs">
-                <p className="muted">The RevOps analyst reads every deal record. Try:</p>
+                <p className="muted">
+                  {clientId
+                    ? `Scoped to ${clientName ?? "this client"} — general method + waste vertical + this client's knowledge graph. Try:`
+                    : "The RevOps analyst reads every deal record, plus the general + vertical knowledge graph. Try:"}
+                </p>
                 {SUGGESTIONS.map((s) => (
                   <button key={s} className="chat-sug" onClick={() => send(s)}>{s}</button>
                 ))}

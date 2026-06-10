@@ -209,6 +209,7 @@ function ClientDetail({ row, rows, asOf, workspace, live, onOpenClient, onOpenDe
                       await askAi({
                         asOf,
                         workspace,
+                        clientId: deal.clientId as never,
                         question:
                           `Analyse the MEDDIC snapshot history for the account ${deal.account}, focusing on the ${deal.site} deal (slug ${deal.slug})` +
                           (others.length ? ` but covering ALL deals at this account: ${others.join(", ")} — compare them.` : ".") +
